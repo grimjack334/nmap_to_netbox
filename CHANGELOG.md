@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 - DeviceTypes for enclosures now created with `subdevice_role=parent` and blades with `subdevice_role=child`, resolving the "this type of device does not support device bays" error from NetBox
+- `subdevice_role` is now patched in-place on existing DeviceTypes that were created without it, so the fix applies even when the DeviceType already exists in NetBox
 
 ## [1.1.1] - 2026-06-12
 
