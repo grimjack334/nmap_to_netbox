@@ -286,8 +286,14 @@ class NetBoxSync:
             return self._device_types[slug]
         existing = list(self.nb.dcim.device_types.filter(slug=slug))
         if existing:
-            self._device_types[slug] = existing[0]
-            return existing[0]
+            dt = existing[0]
+            cur_role = dt.subdevice_role.value if dt.subdevice_role else None
+            if subdevice_role and cur_role != subdevice_role:
+                if not self.dry_run:
+                    dt.update({"subdevice_role": subdevice_role})
+                    print(f"  {yellow('[UPDATED]')} DeviceType {model}: subdevice_role → {subdevice_role}")
+            self._device_types[slug] = dt
+            return dt
         if self.dry_run:
             stub = _Stub(model=model, slug=slug)
             self._device_types[slug] = stub
