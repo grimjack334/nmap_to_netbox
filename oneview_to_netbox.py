@@ -420,7 +420,7 @@ class NetBoxSync:
         return action, device
 
     def _sync_device_bays(self, device, bay_count: int) -> None:
-        """Ensure the chassis has device bays numbered Bay 1 … Bay N."""
+        """Ensure the chassis has device bays numbered Device Bay 1 … Device Bay N."""
         if not bay_count:
             return
         existing_bays = {
@@ -428,7 +428,7 @@ class NetBoxSync:
         }
         created = 0
         for i in range(1, bay_count + 1):
-            bay_name = f"Bay {i}"
+            bay_name = f"Device Bay {i}"
             if bay_name not in existing_bays:
                 self.nb.dcim.device_bays.create(device=device.id, name=bay_name)
                 created += 1
@@ -514,7 +514,7 @@ class NetBoxSync:
             )
             return
 
-        bay_name = f"Bay {position}"
+        bay_name = f"Device Bay {position}"
         bays = list(self.nb.dcim.device_bays.filter(device_id=chassis.id, name=bay_name))
         if not bays:
             print(f"    {yellow('[WARN]')} '{bay_name}' not found on {chassis.name}")
