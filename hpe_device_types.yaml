@@ -3,10 +3,13 @@
 # Pass this file with --device-types-file hpe_device_types.yaml
 #
 # Each entry:
-#   match     - case-insensitive substring matched against the OneView model name
-#               (first match wins, so put more-specific entries first)
-#   model     - NetBox DeviceType model name to create/use
-#   u_height  - rack units (0 for blade/module, 1+ for rack-mount)
+#   match          - case-insensitive substring matched against the OneView model name
+#                    (first match wins, so put more-specific entries first)
+#   model          - NetBox DeviceType model name to create/use
+#   u_height       - rack units (0 for blade/module, 1+ for rack-mount)
+#   subdevice_role - (optional) "parent" for chassis, "child" for blades/modules;
+#                    omit for standalone rack servers. The script sets this
+#                    automatically based on context; override here only if needed.
 
 device_types:
 

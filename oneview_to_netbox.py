@@ -275,10 +275,11 @@ class NetBoxSync:
         print(f"  {green('[CREATED]')} Manufacturer: {self.MANUFACTURER_NAME}")
         return self._manufacturer
 
-    def _get_device_type(self, ov_model: str, u_height: int = 1):
+    def _get_device_type(self, ov_model: str, u_height: int = 1, subdevice_role: Optional[str] = None):
         defn = self._resolve_type_def(ov_model)
-        model    = defn["model"]     if defn and "model"    in defn else ov_model
-        u_height = defn["u_height"]  if defn and "u_height" in defn else u_height
+        model          = defn["model"]          if defn and "model"          in defn else ov_model
+        u_height       = defn["u_height"]       if defn and "u_height"       in defn else u_height
+        subdevice_role = defn["subdevice_role"] if defn and "subdevice_role" in defn else subdevice_role
 
         slug = self._slugify(model)
         if slug in self._device_types:
@@ -293,12 +294,15 @@ class NetBoxSync:
             print(f"  {yellow('[DRY-RUN]')} would create DeviceType: {model}")
             return stub
         mfr = self._get_manufacturer()
-        dt  = self.nb.dcim.device_types.create(
+        create_kwargs = dict(
             manufacturer=mfr.id,
             model=model,
             slug=slug,
             u_height=u_height,
         )
+        if subdevice_role:
+            create_kwargs["subdevice_role"] = subdevice_role
+        dt = self.nb.dcim.device_types.create(**create_kwargs)
         self._device_types[slug] = dt
         print(f"  {green('[CREATED]')} DeviceType: {model}")
         return dt
@@ -370,7 +374,7 @@ class NetBoxSync:
             return "skipped", None
 
         self._seen_chassis_names.add(name)
-        dt   = self._get_device_type(model, u_height=10)
+        dt   = self._get_device_type(model, u_height=10, subdevice_role="parent")
         role = self._get_device_role(self.chassis_role)
 
         payload = {
@@ -452,7 +456,8 @@ class NetBoxSync:
         self._seen_server_names.add(name)
         is_blade  = bool(location_uri and position is not None)
         nb_status = "active" if power_state == "On" else "offline"
-        dt        = self._get_device_type(model, u_height=0 if is_blade else 1)
+        dt        = self._get_device_type(model, u_height=0 if is_blade else 1,
+                                           subdevice_role="child" if is_blade else None)
         role      = self._get_device_role(self.server_role)
 
         payload = {
