@@ -175,7 +175,7 @@ python oneview_to_netbox.py ... --skip-chassis
 
 **Upsert semantics** — devices are matched by name within the site. Existing records are updated only when serial or status differs; unchanged records are skipped.
 
-**Device bays** — bays are named `Bay 1`, `Bay 2`, … up to the enclosure's `deviceBayCount`. New bays are added on each run; existing bays are never removed.
+**Device bays** — bays are named `Device Bay 1`, `Device Bay 2`, … up to the enclosure's `deviceBayCount`. New bays are added on each run; existing bays are never removed.
 
 **Power state mapping** — OneView `On` → NetBox `active`; anything else → `offline`.
 
