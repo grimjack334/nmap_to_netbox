@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-06-12
+
+### Added
+- `oneview_to_netbox.py` — sync HP OneView enclosures and server hardware into NetBox as Device records, with blade-to-chassis DeviceBay linking
+- `--tenant` option: assign all synced devices to a NetBox tenant (resolved by name or slug)
+- `--device-types-file` option: YAML file mapping OneView model names to NetBox DeviceType definitions (model name, u_height) via case-insensitive substring matching
+- `hpe_device_types.yaml` — bundled example with 25 common HPE enclosure, blade, and rack server entries
+- Field-level dry-run diffs with ANSI colour output for chassis and server sync
+- `--delete-missing` to remove NetBox devices (matching role + site) absent from OneView
+
+### Changed
+- Manufacturer name for HPE devices set to `HPE` (previously `Hewlett Packard Enterprise`)
+
 ## [1.0.0] - 2026-06-01
 
 ### Added
