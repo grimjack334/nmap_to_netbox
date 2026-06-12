@@ -10,13 +10,15 @@ Sync HP OneView enclosures and server hardware into [NetBox](https://netbox.dev)
 | Blade server | Device (role=Server) installed in the matching chassis DeviceBay |
 | Rack-mount server | Device (role=Server) standalone |
 
-Auto-created on first run if absent: `Manufacturer` (Hewlett Packard Enterprise), `DeviceType` per model name, `DeviceRole` for chassis and server role names.
+Auto-created on first run if absent: `Manufacturer` (HPE), `DeviceType` per model name, `DeviceRole` for chassis and server role names.
 
 ## Requirements
 
 ```
-pip install pynetbox requests
+pip install pynetbox requests pyyaml
 ```
+
+`pyyaml` is only required when using `--device-types-file`; the script runs without it otherwise.
 
 HP OneView 5.x – 8.x is supported. The API version is auto-detected at startup; override with `--oneview-api-version` if needed.
 
@@ -69,6 +71,41 @@ python oneview_to_netbox.py \
     --no-ssl-verify
 ```
 
+### Sync with device type definitions
+
+Use `hpe_device_types.yaml` (included) to control the NetBox model name and rack height for each device type instead of relying on the raw OneView model string:
+
+```bash
+python oneview_to_netbox.py \
+    --oneview-host  https://oneview.example.com \
+    --oneview-user  Administrator \
+    --oneview-password SECRET \
+    --netbox-url    https://netbox.example.com \
+    --token         YOUR_API_TOKEN \
+    --site          my-datacenter \
+    --device-types-file hpe_device_types.yaml \
+    --no-ssl-verify
+```
+
+The file is a YAML list. Each entry matches a OneView model name by substring and defines the NetBox DeviceType to create:
+
+```yaml
+device_types:
+  - match: "c7000"
+    model: "HPE BladeSystem c7000"
+    u_height: 10
+
+  - match: "BL460c Gen10"
+    model: "HPE ProLiant BL460c Gen10"
+    u_height: 0
+
+  - match: "DL380 Gen10"
+    model: "HPE ProLiant DL380 Gen10"
+    u_height: 2
+```
+
+`match` is a case-insensitive substring of the OneView model name. The first matching entry wins, so list more-specific entries before broader ones. If no entry matches, the raw OneView model name is used as-is.
+
 ### Sync with stale-device cleanup
 
 Preview what would be deleted, then apply:
@@ -111,6 +148,12 @@ python oneview_to_netbox.py ... --skip-chassis
 | `--site` | required | Site name where devices will be placed (must already exist) |
 | `--tenant NAME` | none | Tenant name or slug to assign to all synced devices (must already exist) |
 
+### Device types
+
+| Flag | Default | Description |
+|---|---|---|
+| `--device-types-file FILE` | none | YAML file mapping OneView model names to NetBox DeviceType definitions (model name, u_height). See `hpe_device_types.yaml` for a full example. |
+
 ### Device roles
 
 | Flag | Default | Description |
@@ -137,6 +180,8 @@ python oneview_to_netbox.py ... --skip-chassis
 **Power state mapping** — OneView `On` → NetBox `active`; anything else → `offline`.
 
 **`--delete-missing` safety** — only devices with the configured chassis or server role at the configured site are candidates for deletion. Devices added manually or from other sources are not affected. Servers are always deleted before chassis so blades are cleanly vacated from their bays first. `--delete-missing` is ignored for any phase skipped with `--skip-chassis` or `--skip-servers`.
+
+**Device type definitions** — when `--device-types-file` is supplied, each OneView model name is matched against the `match` substrings in order; the first hit's `model` and `u_height` values are used when creating the NetBox DeviceType. If no entry matches, the raw OneView model string and the default u_height are used. If a DeviceType with that slug already exists in NetBox it is reused as-is regardless of the file.
 
 **Chassis not synced in same run** — if servers are synced without chassis (e.g. `--skip-chassis`), blade-to-bay linking is skipped with a warning. Re-run including chassis to establish links.
 

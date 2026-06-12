@@ -177,8 +177,8 @@ class OneViewClient:
 
 class NetBoxSync:
 
-    MANUFACTURER_NAME = "Hewlett Packard Enterprise"
-    MANUFACTURER_SLUG = "hewlett-packard-enterprise"
+    MANUFACTURER_NAME = "HPE"
+    MANUFACTURER_SLUG = "hpe"
 
     def __init__(
         self,
@@ -188,6 +188,7 @@ class NetBoxSync:
         chassis_role: str,
         server_role: str,
         tenant_name: Optional[str] = None,
+        device_types_file: Optional[str] = None,
         dry_run: bool = False,
     ):
         self.dry_run      = dry_run
@@ -201,6 +202,7 @@ class NetBoxSync:
         self._enclosure_uri_map: dict       = {}   # OV uri → nb device
         self._seen_chassis_names: set       = set()
         self._seen_server_names: set        = set()
+        self._type_defs: list               = self._load_type_defs(device_types_file) if device_types_file else []
 
         try:
             self.nb.status()
@@ -230,6 +232,31 @@ class NetBoxSync:
                 return tenants[0]
         sys.exit(f"Tenant '{name}' not found in NetBox. Create it first.")
 
+    @staticmethod
+    def _load_type_defs(path: str) -> list:
+        try:
+            import yaml
+        except ImportError:
+            sys.exit("Missing dependency for --device-types-file: pip install pyyaml")
+        try:
+            with open(path) as fh:
+                data = yaml.safe_load(fh)
+            if not isinstance(data, dict) or "device_types" not in data:
+                sys.exit(f"Device types file '{path}' must contain a top-level 'device_types' list.")
+            return data["device_types"]
+        except OSError as exc:
+            sys.exit(f"Cannot read device types file '{path}': {exc}")
+        except Exception as exc:
+            sys.exit(f"Invalid device types file '{path}': {exc}")
+
+    def _resolve_type_def(self, ov_model: str) -> Optional[dict]:
+        """Return the first type definition whose 'match' is a substring of ov_model."""
+        lower = ov_model.lower()
+        for defn in self._type_defs:
+            if defn.get("match", "").lower() in lower:
+                return defn
+        return None
+
     def _get_manufacturer(self):
         if self._manufacturer:
             return self._manufacturer
@@ -248,7 +275,11 @@ class NetBoxSync:
         print(f"  {green('[CREATED]')} Manufacturer: {self.MANUFACTURER_NAME}")
         return self._manufacturer
 
-    def _get_device_type(self, model: str, u_height: int = 1):
+    def _get_device_type(self, ov_model: str, u_height: int = 1):
+        defn = self._resolve_type_def(ov_model)
+        model    = defn["model"]     if defn and "model"    in defn else ov_model
+        u_height = defn["u_height"]  if defn and "u_height" in defn else u_height
+
         slug = self._slugify(model)
         if slug in self._device_types:
             return self._device_types[slug]
@@ -559,6 +590,11 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--tenant",     default=None,
                    help="NetBox tenant name or slug to assign to synced devices (optional)")
 
+    g = p.add_argument_group("Device types")
+    g.add_argument("--device-types-file", default=None, metavar="FILE",
+                   help="YAML file mapping OneView model names to NetBox DeviceType definitions "
+                        "(model name, u_height). See hpe_device_types.yaml for an example.")
+
     g = p.add_argument_group("Device roles")
     g.add_argument("--chassis-role", default="Chassis",
                    help="DeviceRole name for enclosures (default: Chassis)")
@@ -629,6 +665,7 @@ def main() -> None:
         chassis_role=args.chassis_role,
         server_role=args.server_role,
         tenant_name=args.tenant,
+        device_types_file=args.device_types_file,
         dry_run=args.dry_run,
     )
     tenant_str = f"  tenant: {syncer._tenant.name}" if syncer._tenant else ""

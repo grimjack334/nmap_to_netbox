@@ -1,0 +1,119 @@
+# HPE device type definitions for oneview_to_netbox.py
+#
+# Pass this file with --device-types-file hpe_device_types.yaml
+#
+# Each entry:
+#   match     - case-insensitive substring matched against the OneView model name
+#               (first match wins, so put more-specific entries first)
+#   model     - NetBox DeviceType model name to create/use
+#   u_height  - rack units (0 for blade/module, 1+ for rack-mount)
+
+device_types:
+
+  # ── Enclosures ────────────────────────────────────────────────────────────
+
+  - match: "Synergy 12000"
+    model: "HPE Synergy 12000 Frame"
+    u_height: 10
+
+  - match: "c7000"
+    model: "HPE BladeSystem c7000"
+    u_height: 10
+
+  - match: "c3000"
+    model: "HPE BladeSystem c3000"
+    u_height: 6
+
+  # ── Synergy compute modules ───────────────────────────────────────────────
+
+  - match: "Synergy 660 Gen10"
+    model: "HPE Synergy 660 Gen10 Compute Module"
+    u_height: 0
+
+  - match: "Synergy 480 Gen10 Plus"
+    model: "HPE Synergy 480 Gen10 Plus Compute Module"
+    u_height: 0
+
+  - match: "Synergy 480 Gen10"
+    model: "HPE Synergy 480 Gen10 Compute Module"
+    u_height: 0
+
+  - match: "Synergy 480 Gen9"
+    model: "HPE Synergy 480 Gen9 Compute Module"
+    u_height: 0
+
+  # ── ProLiant blade servers ────────────────────────────────────────────────
+
+  - match: "BL460c Gen10"
+    model: "HPE ProLiant BL460c Gen10"
+    u_height: 0
+
+  - match: "BL460c Gen9"
+    model: "HPE ProLiant BL460c Gen9"
+    u_height: 0
+
+  - match: "BL460c Gen8"
+    model: "HPE ProLiant BL460c Gen8"
+    u_height: 0
+
+  - match: "BL660c Gen9"
+    model: "HPE ProLiant BL660c Gen9"
+    u_height: 0
+
+  # ── ProLiant rack servers ─────────────────────────────────────────────────
+
+  - match: "DL20 Gen10"
+    model: "HPE ProLiant DL20 Gen10"
+    u_height: 1
+
+  - match: "DL360 Gen10 Plus"
+    model: "HPE ProLiant DL360 Gen10 Plus"
+    u_height: 1
+
+  - match: "DL360 Gen10"
+    model: "HPE ProLiant DL360 Gen10"
+    u_height: 1
+
+  - match: "DL360 Gen9"
+    model: "HPE ProLiant DL360 Gen9"
+    u_height: 1
+
+  - match: "DL380 Gen10 Plus"
+    model: "HPE ProLiant DL380 Gen10 Plus"
+    u_height: 2
+
+  - match: "DL380 Gen10"
+    model: "HPE ProLiant DL380 Gen10"
+    u_height: 2
+
+  - match: "DL380 Gen9"
+    model: "HPE ProLiant DL380 Gen9"
+    u_height: 2
+
+  - match: "DL560 Gen10"
+    model: "HPE ProLiant DL560 Gen10"
+    u_height: 2
+
+  - match: "DL580 Gen10"
+    model: "HPE ProLiant DL580 Gen10"
+    u_height: 4
+
+  - match: "DL160 Gen10"
+    model: "HPE ProLiant DL160 Gen10"
+    u_height: 1
+
+  - match: "DL180 Gen10"
+    model: "HPE ProLiant DL180 Gen10"
+    u_height: 2
+
+  - match: "DL120 Gen9"
+    model: "HPE ProLiant DL120 Gen9"
+    u_height: 1
+
+  - match: "ML350 Gen10"
+    model: "HPE ProLiant ML350 Gen10"
+    u_height: 5
+
+  - match: "ML110 Gen10"
+    model: "HPE ProLiant ML110 Gen10"
+    u_height: 4
