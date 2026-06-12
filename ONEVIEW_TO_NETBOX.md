@@ -23,6 +23,7 @@ HP OneView 5.x – 8.x is supported. The API version is auto-detected at startup
 ## NetBox prerequisites
 
 - A **Site** must already exist in NetBox. All synced devices are placed there.
+- If using `--tenant`, the **Tenant** must already exist in NetBox.
 - The API token needs permission to create/update/delete under **DCIM** (devices, device types, device roles, manufacturers, device bays).
 
 ## Usage
@@ -51,6 +52,20 @@ python oneview_to_netbox.py \
     --netbox-url    https://netbox.example.com \
     --token         YOUR_API_TOKEN \
     --site          my-datacenter \
+    --no-ssl-verify
+```
+
+### Sync with a tenant
+
+```bash
+python oneview_to_netbox.py \
+    --oneview-host  https://oneview.example.com \
+    --oneview-user  Administrator \
+    --oneview-password SECRET \
+    --netbox-url    https://netbox.example.com \
+    --token         YOUR_API_TOKEN \
+    --site          my-datacenter \
+    --tenant        my-tenant \
     --no-ssl-verify
 ```
 
@@ -94,6 +109,7 @@ python oneview_to_netbox.py ... --skip-chassis
 | `--netbox-url` | required | NetBox base URL (no trailing slash) |
 | `--token` | required | NetBox API token |
 | `--site` | required | Site name where devices will be placed (must already exist) |
+| `--tenant NAME` | none | Tenant name or slug to assign to all synced devices (must already exist) |
 
 ### Device roles
 

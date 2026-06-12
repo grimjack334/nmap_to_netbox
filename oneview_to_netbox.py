@@ -26,6 +26,7 @@ Usage:
         [--oneview-api-version 2400] \\
         [--chassis-role Chassis] \\
         [--server-role  Server] \\
+        [--tenant       my-tenant] \\
         [--no-ssl-verify] \\
         [--skip-chassis] \\
         [--skip-servers] \\
@@ -186,6 +187,7 @@ class NetBoxSync:
         site_name: str,
         chassis_role: str,
         server_role: str,
+        tenant_name: Optional[str] = None,
         dry_run: bool = False,
     ):
         self.dry_run      = dry_run
@@ -205,7 +207,8 @@ class NetBoxSync:
         except Exception as exc:
             sys.exit(f"Cannot reach NetBox: {exc}")
 
-        self._site = self._require_site(site_name)
+        self._site   = self._require_site(site_name)
+        self._tenant = self._resolve_tenant(tenant_name) if tenant_name else None
 
     # ---- helpers -----------------------------------------------------------
 
@@ -219,6 +222,13 @@ class NetBoxSync:
             if sites:
                 return sites[0]
         sys.exit(f"Site '{name}' not found in NetBox. Create it first.")
+
+    def _resolve_tenant(self, name: str):
+        for filt in ({"name": name}, {"slug": self._slugify(name)}):
+            tenants = list(self.nb.tenancy.tenants.filter(**filt))
+            if tenants:
+                return tenants[0]
+        sys.exit(f"Tenant '{name}' not found in NetBox. Create it first.")
 
     def _get_manufacturer(self):
         if self._manufacturer:
@@ -302,6 +312,13 @@ class NetBoxSync:
         if new_status and cur_status != new_status:
             changes.append(f"    status: {red(cur_status)} → {green(new_status)}")
 
+        new_tenant_id = desired.get("tenant")
+        cur_tenant_id = existing.tenant.id if existing.tenant else None
+        if new_tenant_id != cur_tenant_id:
+            cur_label = str(existing.tenant) if existing.tenant else "None"
+            new_label = str(new_tenant_id) if new_tenant_id else "None"
+            changes.append(f"    tenant: {red(cur_label)} → {green(new_label)}")
+
         return changes
 
     # ---- enclosure sync ----------------------------------------------------
@@ -332,6 +349,7 @@ class NetBoxSync:
             "site":        self._site.id,
             "serial":      serial,
             "status":      "active",
+            "tenant":      self._tenant.id if self._tenant else None,
         }
 
         existing = list(self.nb.dcim.devices.filter(name=name, site_id=self._site.id))
@@ -413,6 +431,7 @@ class NetBoxSync:
             "site":        self._site.id,
             "serial":      serial,
             "status":      nb_status,
+            "tenant":      self._tenant.id if self._tenant else None,
         }
 
         existing = list(self.nb.dcim.devices.filter(name=name, site_id=self._site.id))
@@ -537,6 +556,8 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--token",      required=True, help="NetBox API token")
     g.add_argument("--site",       required=True,
                    help="NetBox site name (must already exist) where devices will be placed")
+    g.add_argument("--tenant",     default=None,
+                   help="NetBox tenant name or slug to assign to synced devices (optional)")
 
     g = p.add_argument_group("Device roles")
     g.add_argument("--chassis-role", default="Chassis",
@@ -607,9 +628,11 @@ def main() -> None:
         site_name=args.site,
         chassis_role=args.chassis_role,
         server_role=args.server_role,
+        tenant_name=args.tenant,
         dry_run=args.dry_run,
     )
-    print(f"  Connected  (site: {syncer._site.name})")
+    tenant_str = f"  tenant: {syncer._tenant.name}" if syncer._tenant else ""
+    print(f"  Connected  (site: {syncer._site.name}{tenant_str})")
 
     # ---- Enclosures ---------------------------------------------------------
     if not args.skip_chassis:
