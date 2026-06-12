@@ -183,6 +183,8 @@ python oneview_to_netbox.py ... --skip-chassis
 
 **Device type definitions** — when `--device-types-file` is supplied, each OneView model name is matched against the `match` substrings in order; the first hit's `model` and `u_height` values are used when creating the NetBox DeviceType. If no entry matches, the raw OneView model string and the default u_height are used. If a DeviceType with that slug already exists in NetBox it is reused as-is regardless of the file.
 
+**`subdevice_role` enforcement** — NetBox requires a DeviceType to have `subdevice_role=parent` before device bays can be created on devices of that type, and `subdevice_role=child` for blades and compute modules. The script sets these automatically when creating DeviceTypes, and patches them in-place on any existing DeviceType that is missing the correct value.
+
 **Chassis not synced in same run** — if servers are synced without chassis (e.g. `--skip-chassis`), blade-to-bay linking is skipped with a warning. Re-run including chassis to establish links.
 
 **NetBox version** — the script uses the `role` field name introduced in NetBox 4.0. On NetBox 3.x the equivalent field is `device_role`; adjust line 330 / 410 of the script if needed.
