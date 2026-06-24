@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.1.5] - 2026-06-24
+
+### Added
+- `--label-site PREFIX` and `--label-tenant PREFIX` CLI args to override site/tenant per device based on OneView labels (e.g. label `site:DC-West` with `--label-site "site:"` sets that device's site to `DC-West`)
+- Labels are fetched from the OneView `/rest/labels/resources` endpoint only when a label-mapping arg is supplied; unknown values warn and fall back to the global defaults
+
 ## [1.1.4] - 2026-06-24
 
 ### Changed
