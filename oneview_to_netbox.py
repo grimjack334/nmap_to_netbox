@@ -466,8 +466,9 @@ class NetBoxSync:
         site   = site_override   or self._site
         tenant = tenant_override or self._tenant
 
-        if site.name.lower() == "unknown" and tenant.name.lower() == "unknown":
-            print(f"  {yellow('[WARN]')} Chassis '{name}' has no site or tenant set — skipping")
+        if site.name.lower() == "unknown" or tenant.name.lower() == "unknown":
+            missing = [f for f, o in (("site", site), ("tenant", tenant)) if o.name.lower() == "unknown"]
+            print(f"  {yellow('[WARN]')} Chassis '{name}' missing {', '.join(missing)} — skipping")
             return "skipped", None
 
         self._seen_chassis_names.add(name)
@@ -564,8 +565,9 @@ class NetBoxSync:
         site   = site_override   or self._site
         tenant = tenant_override or self._tenant
 
-        if site.name.lower() == "unknown" and tenant.name.lower() == "unknown":
-            print(f"  {yellow('[WARN]')} Server '{name}' has no site or tenant set — skipping")
+        if site.name.lower() == "unknown" or tenant.name.lower() == "unknown":
+            missing = [f for f, o in (("site", site), ("tenant", tenant)) if o.name.lower() == "unknown"]
+            print(f"  {yellow('[WARN]')} Server '{name}' missing {', '.join(missing)} — skipping")
             return "skipped", None
 
         nb_status = "active" if power_state == "On" else "offline"
