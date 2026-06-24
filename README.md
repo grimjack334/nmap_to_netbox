@@ -87,7 +87,7 @@ Syncs HP OneView enclosures and server hardware into NetBox as Device records.
 - Blade servers linked to their parent chassis DeviceBay
 - Rack servers created as standalone Devices
 - Auto-creates Manufacturers, DeviceTypes, and DeviceRoles as needed
-- Per-device site/tenant override via OneView labels
+- Site and tenant resolved per device from OneView labels; devices with either field unresolved are skipped
 
 ### Requirements
 
@@ -98,12 +98,25 @@ pip install pynetbox requests
 ### Usage
 
 ```bash
+# Minimal — site and tenant default to "Unknown" unless resolved from labels
 python oneview_to_netbox.py \
     --oneview-host  https://oneview.example.com \
     --oneview-user  Administrator \
     --netbox-url    https://netbox.example.com \
     --token         YOUR_API_TOKEN \
-    --site          my-datacenter
+    --label-site \
+    --label-tenant
+
+# Explicit site/tenant fallback with label overrides per device
+python oneview_to_netbox.py \
+    --oneview-host  https://oneview.example.com \
+    --oneview-user  Administrator \
+    --netbox-url    https://netbox.example.com \
+    --token         YOUR_API_TOKEN \
+    --site          default-dc \
+    --tenant        default-tenant \
+    --label-site \
+    --label-tenant
 
 # Password is prompted securely if --oneview-password is omitted
 
@@ -170,7 +183,7 @@ python oneview_to_netbox.py ... --server-filter db01 db02 --chassis-filter encl-
 
 ### Behaviour
 
-- **Idempotent** — safe to run repeatedly; unchanged records are updated in place; unchanged records are skipped.
+- **Idempotent** — safe to run repeatedly; changed records are updated in place, unchanged records are skipped.
 - **Site/tenant changes** — if a label changes a device's site or tenant, the existing NetBox record is updated in place rather than a duplicate being created.
 - **Unresolved site or tenant** — devices where either site or tenant resolves to `Unknown` are skipped with a warning naming the missing field(s).
 - **Server names** — uses the OS hostname (`serverName`) in preference to the OneView inventory name; domain suffixes are stripped.
