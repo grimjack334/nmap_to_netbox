@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-06-24
+
+### Fixed
+- Devices whose site or tenant changed via label are now updated in place instead of creating a duplicate record at the new site/tenant
+- Site changes are now included in dry-run field-level diffs
+
+### Changed
+- Devices are skipped if **either** site or tenant is unresolved (Unknown), not just when both are; the warning message names the specific missing field(s)
+
 ## [1.1.9] - 2026-06-24
 
 ### Changed
