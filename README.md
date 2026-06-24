@@ -183,6 +183,15 @@ python oneview_to_netbox.py ... --site default-dc --tenant default-tenant --labe
 | `DCWest` | name `DCWest` or slug `dc-west` |
 | `DC1` | name `DC1` or slug `dc1` |
 
+**Debugging labels** — when `--label-site` or `--label-tenant` is active, a `[LABELS]` line is printed for each device showing the labels fetched from OneView:
+
+```
+  [LABELS] web01: DCWest, ACME
+  [LABELS] encl-a: London
+```
+
+If no `[LABELS]` line appears for a device, the label fetch returned empty — check for a `[WARN]` on stderr indicating an API error, or verify that labels are assigned to the device in OneView. If the line appears but the device is still skipped, the label value does not match any NetBox site or tenant name/slug.
+
 ### Targeted sync
 
 Use `--chassis-filter` and `--server-filter` to limit a run to specific devices by name (case-insensitive substring match). Multiple values are OR'd together.
