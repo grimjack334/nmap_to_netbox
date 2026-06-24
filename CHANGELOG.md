@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.2.4] - 2026-06-24
+
+### Changed
+- README updated to document the constraint-safe two-step device lookup behaviour
+
 ## [1.2.3] - 2026-06-24
 
 ### Fixed
