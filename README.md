@@ -122,8 +122,8 @@ python oneview_to_netbox.py ... --dry-run
 | `--chassis-role` | `Chassis` | DeviceRole name for enclosures |
 | `--server-role` | `Server` | DeviceRole name for servers |
 | `--device-types-file` | — | YAML file mapping OneView model names to NetBox DeviceType definitions |
-| `--label-site PREFIX` | — | OneView label prefix that sets the site per device (e.g. `site:`) |
-| `--label-tenant PREFIX` | — | OneView label prefix that sets the tenant per device (e.g. `tenant:`) |
+| `--label-site` | off | Match device labels against NetBox site names/slugs to override the default site |
+| `--label-tenant` | off | Match device labels against NetBox tenant names/slugs to override the default tenant |
 | `--skip-chassis` | off | Skip enclosure sync |
 | `--skip-servers` | off | Skip server hardware sync |
 | `--delete-missing` | off | Delete NetBox devices absent from OneView (use `--dry-run` first) |
@@ -132,18 +132,18 @@ python oneview_to_netbox.py ... --dry-run
 
 ### Label-based site/tenant mapping
 
-OneView labels can override the global `--site` and `--tenant` on a per-device basis. Labels follow a `prefix:value` convention:
+OneView labels can override the global `--site` and `--tenant` on a per-device basis. When `--label-site` or `--label-tenant` is set, each label on the device is matched against NetBox site/tenant names and slugs. The first match wins; if no label matches, the global default is used.
 
 ```bash
-# Labels "site:DC-West" and "tenant:ACME" on a device will route it
-# to site=DC-West and tenant=ACME instead of the global defaults
+# A device with labels ["DCWest", "ACME"] will be placed in site=DCWest
+# and assigned tenant=ACME if those names exist in NetBox
 python oneview_to_netbox.py ... \
-    --site          fallback-dc \
-    --label-site    "site:" \
-    --label-tenant  "tenant:"
+    --site         fallback-dc \
+    --label-site \
+    --label-tenant
 ```
 
-If a label value doesn't match a known NetBox site or tenant, a warning is printed and the global default is used.
+Note: OneView labels are alphanumeric only, so the label name itself must match the NetBox site or tenant name/slug.
 
 ### Behaviour
 

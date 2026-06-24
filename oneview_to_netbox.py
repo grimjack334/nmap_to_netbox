@@ -206,16 +206,16 @@ class NetBoxSync:
         server_role: str,
         tenant_name: Optional[str] = None,
         device_types_file: Optional[str] = None,
-        label_site_prefix: Optional[str] = None,
-        label_tenant_prefix: Optional[str] = None,
+        label_site: bool = False,
+        label_tenant: bool = False,
         dry_run: bool = False,
     ):
-        self.dry_run              = dry_run
-        self.chassis_role         = chassis_role
-        self.server_role          = server_role
-        self.nb                   = pynetbox.api(url, token=token)
-        self._label_site_prefix   = label_site_prefix
-        self._label_tenant_prefix = label_tenant_prefix
+        self.dry_run          = dry_run
+        self.chassis_role     = chassis_role
+        self.server_role      = server_role
+        self.nb               = pynetbox.api(url, token=token)
+        self._label_site      = label_site
+        self._label_tenant    = label_tenant
 
         self._manufacturer                  = None
         self._device_types: dict            = {}   # slug → object
@@ -256,7 +256,7 @@ class NetBoxSync:
         sys.exit(f"Tenant '{name}' not found in NetBox. Create it first.")
 
     def _find_site(self, name: str):
-        """Look up a site by name/slug; warn and return None if not found."""
+        """Look up a site by name/slug; return None silently if not found."""
         if name in self._site_cache:
             return self._site_cache[name]
         for filt in ({"name": name}, {"slug": self._slugify(name)}):
@@ -264,11 +264,11 @@ class NetBoxSync:
             if sites:
                 self._site_cache[name] = sites[0]
                 return sites[0]
-        print(f"  {yellow('[WARN]')} Label site '{name}' not found in NetBox — using default")
+        self._site_cache[name] = None
         return None
 
     def _find_tenant(self, name: str):
-        """Look up a tenant by name/slug; warn and return None if not found."""
+        """Look up a tenant by name/slug; return None silently if not found."""
         if name in self._tenant_cache:
             return self._tenant_cache[name]
         for filt in ({"name": name}, {"slug": self._slugify(name)}):
@@ -276,22 +276,20 @@ class NetBoxSync:
             if tenants:
                 self._tenant_cache[name] = tenants[0]
                 return tenants[0]
-        print(f"  {yellow('[WARN]')} Label tenant '{name}' not found in NetBox — using default")
+        self._tenant_cache[name] = None
         return None
 
     def _apply_labels(self, labels: list) -> tuple:
-        """Return (site_override, tenant_override) derived from OneView labels, or (None, None)."""
+        """Return (site_override, tenant_override) by matching labels against NetBox sites/tenants."""
         site_override   = None
         tenant_override = None
         for label in labels:
-            if self._label_site_prefix and label.startswith(self._label_site_prefix):
-                value = label[len(self._label_site_prefix):]
-                if value:
-                    site_override = self._find_site(value)
-            if self._label_tenant_prefix and label.startswith(self._label_tenant_prefix):
-                value = label[len(self._label_tenant_prefix):]
-                if value:
-                    tenant_override = self._find_tenant(value)
+            if self._label_site and site_override is None:
+                site_override = self._find_site(label)
+            if self._label_tenant and tenant_override is None:
+                tenant_override = self._find_tenant(label)
+            if site_override and tenant_override:
+                break
         return site_override, tenant_override
 
     @staticmethod
@@ -691,12 +689,12 @@ def build_parser() -> argparse.ArgumentParser:
                    help="DeviceRole name for servers (default: Server)")
 
     g = p.add_argument_group("Label mappings")
-    g.add_argument("--label-site",   default=None, metavar="PREFIX",
-                   help="OneView label prefix that overrides the NetBox site per device "
-                        "(e.g. 'site:' matches label 'site:DC-West' → site=DC-West)")
-    g.add_argument("--label-tenant", default=None, metavar="PREFIX",
-                   help="OneView label prefix that overrides the NetBox tenant per device "
-                        "(e.g. 'tenant:' matches label 'tenant:ACME' → tenant=ACME)")
+    g.add_argument("--label-site",   action="store_true",
+                   help="Match device labels against NetBox site names/slugs to override "
+                        "the default site per device")
+    g.add_argument("--label-tenant", action="store_true",
+                   help="Match device labels against NetBox tenant names/slugs to override "
+                        "the default tenant per device")
 
     g = p.add_argument_group("Behaviour")
     g.add_argument("--no-ssl-verify", action="store_true",
@@ -765,11 +763,11 @@ def main() -> None:
         server_role=args.server_role,
         tenant_name=args.tenant,
         device_types_file=args.device_types_file,
-        label_site_prefix=args.label_site,
-        label_tenant_prefix=args.label_tenant,
+        label_site=args.label_site,
+        label_tenant=args.label_tenant,
         dry_run=args.dry_run,
     )
-    use_labels = bool(args.label_site or args.label_tenant)
+    use_labels = args.label_site or args.label_tenant
     tenant_str = f"  tenant: {syncer._tenant.name}" if syncer._tenant else ""
     print(f"  Connected  (site: {syncer._site.name}{tenant_str})")
 
