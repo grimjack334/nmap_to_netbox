@@ -703,6 +703,12 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Skip enclosure/chassis sync")
     g.add_argument("--skip-servers",  action="store_true",
                    help="Skip server hardware sync")
+    g.add_argument("--chassis-filter", nargs="+", metavar="NAME", default=None,
+                   help="Only sync chassis whose name contains one of these strings "
+                        "(case-insensitive); all others are skipped")
+    g.add_argument("--server-filter",  nargs="+", metavar="NAME", default=None,
+                   help="Only sync servers whose name contains one of these strings "
+                        "(case-insensitive); all others are skipped")
     g.add_argument("--delete-missing", action="store_true",
                    help="Delete NetBox devices (matching role+site) absent from OneView. "
                         "Only applies to phases that were not skipped. "
@@ -710,6 +716,12 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--dry-run",       action="store_true",
                    help="Preview all changes with field-level diffs; nothing is written")
     return p
+
+
+def _name_matches(name: str, filters: list) -> bool:
+    """Return True if name contains any filter string (case-insensitive)."""
+    lower = name.lower()
+    return any(f.lower() in lower for f in filters)
 
 
 def _print_stats(label: str, stats: dict) -> None:
@@ -775,6 +787,9 @@ def main() -> None:
     if not args.skip_chassis:
         print("\nFetching enclosures from OneView …")
         enclosures = ov.get_enclosures()
+        if args.chassis_filter:
+            enclosures = [e for e in enclosures
+                          if _name_matches(e.get("name") or "", args.chassis_filter)]
         print(f"  Found {len(enclosures)} enclosure(s)\n")
 
         stats: dict = {"created": 0, "updated": 0, "unchanged": 0, "skipped": 0, "errors": 0}
@@ -796,6 +811,12 @@ def main() -> None:
     if not args.skip_servers:
         print("\nFetching server hardware from OneView …")
         servers = ov.get_server_hardware()
+        if args.server_filter:
+            servers = [s for s in servers
+                       if _name_matches(
+                           (s.get("serverName") or s.get("name") or "").split(".")[0],
+                           args.server_filter,
+                       )]
         print(f"  Found {len(servers)} server(s)\n")
 
         stats = {"created": 0, "updated": 0, "unchanged": 0, "skipped": 0, "errors": 0}
