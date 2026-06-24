@@ -98,7 +98,7 @@ pip install pynetbox requests
 ### Usage
 
 ```bash
-# Minimal — site and tenant default to "Unknown" unless resolved from labels
+# Labels only — site and tenant resolved entirely from OneView labels
 python oneview_to_netbox.py \
     --oneview-host  https://oneview.example.com \
     --oneview-user  Administrator \
@@ -107,7 +107,7 @@ python oneview_to_netbox.py \
     --label-site \
     --label-tenant
 
-# Explicit site/tenant fallback with label overrides per device
+# Explicit fallback — labels override per device; unmatched devices use defaults
 python oneview_to_netbox.py \
     --oneview-host  https://oneview.example.com \
     --oneview-user  Administrator \
@@ -130,8 +130,8 @@ python oneview_to_netbox.py ... --dry-run
 |---|---|---|
 | `--oneview-password` | _(prompted)_ | OneView password; prompted via stdin if omitted |
 | `--oneview-api-version` | auto-detect | OneView REST API version |
-| `--site` | `Unknown` | NetBox site for devices; auto-created if it doesn't exist |
-| `--tenant` | `Unknown` | NetBox tenant for devices; auto-created if it doesn't exist |
+| `--site` | — | NetBox site fallback for devices (must already exist); if omitted, site must come from `--label-site` |
+| `--tenant` | — | NetBox tenant fallback for devices (must already exist); if omitted, tenant must come from `--label-tenant` |
 | `--chassis-role` | `Chassis` | DeviceRole name for enclosures |
 | `--server-role` | `Server` | DeviceRole name for servers |
 | `--device-types-file` | — | YAML file mapping OneView model names to NetBox DeviceType definitions |
@@ -147,15 +147,21 @@ python oneview_to_netbox.py ... --dry-run
 
 ### Label-based site/tenant mapping
 
-Enable `--label-site` and/or `--label-tenant` to resolve site and tenant per device from OneView labels. Each label on the device is matched against NetBox site/tenant names and slugs — first match wins. Devices where either site or tenant cannot be resolved are **skipped with a warning** and not written to NetBox.
+Site and tenant are resolved per device in this order:
+
+1. **Label** (if `--label-site` / `--label-tenant` is set) — each OneView label is matched against NetBox site/tenant names and slugs; first match wins
+2. **Global default** (if `--site` / `--tenant` is provided) — used when no label matches
+3. **Unresolved** — if neither label nor default provides a value, the device is **skipped with a warning** naming the missing field(s)
+
+`--site` and `--tenant` are never auto-created; they must already exist in NetBox. Providing a value that doesn't exist exits with an error.
 
 ```bash
-# Devices with label "DCWest" go to site=DCWest; label "ACME" sets tenant=ACME.
-# Devices with no matching label for site or tenant are skipped.
+# All devices must have a matching label or they are skipped
 python oneview_to_netbox.py ... --label-site --label-tenant
-```
 
-If `--label-site` / `--label-tenant` are not used, `--site` and `--tenant` set the global defaults (both default to `Unknown` and are auto-created if absent). Devices that resolve to `Unknown` for either field are still skipped.
+# Devices without a matching label fall back to default-dc / default-tenant
+python oneview_to_netbox.py ... --site default-dc --tenant default-tenant --label-site --label-tenant
+```
 
 **Label format** — OneView labels are alphanumeric only, so the label name must match the NetBox site or tenant name or slug directly:
 
@@ -185,7 +191,7 @@ python oneview_to_netbox.py ... --server-filter db01 db02 --chassis-filter encl-
 
 - **Idempotent** — safe to run repeatedly; changed records are updated in place, unchanged records are skipped.
 - **Site/tenant changes** — if a label changes a device's site or tenant, the existing NetBox record is updated in place. The lookup tries an exact (name, site, tenant) match first; if not found it searches by name only to locate the record to move, avoiding constraint violations.
-- **Unresolved site or tenant** — devices where either site or tenant resolves to `Unknown` are skipped with a warning naming the missing field(s).
+- **Unresolved site or tenant** — devices where either field cannot be resolved (no label match and no `--site`/`--tenant` default) are skipped with a warning naming the specific missing field(s), e.g. `site not set` or `site, tenant not set`.
 - **Server names** — uses the OS hostname (`serverName`) in preference to the OneView inventory name; domain suffixes are stripped.
 - **Unique names enforced** — duplicate server or chassis names (after domain-stripping) are skipped with a warning.
 - **Chassis skip** — enclosures without a URI and blade servers whose chassis wasn't synced are skipped automatically.
