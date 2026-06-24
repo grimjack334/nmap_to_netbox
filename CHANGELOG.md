@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.1.9] - 2026-06-24
+
+### Changed
+- README updated to reflect Unknown default site/tenant, label format reference table, and unique name enforcement behaviour
+
 ## [1.1.8] - 2026-06-24
 
 ### Added
