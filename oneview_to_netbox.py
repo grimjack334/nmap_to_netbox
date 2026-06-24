@@ -177,8 +177,12 @@ class OneViewClient:
             )
             resp.raise_for_status()
             data = resp.json()
-            return [m.get("name", "") for m in data.get("members", []) if m.get("name")]
-        except Exception:
+            # OneView returns {"labels": [...]}; fall back to "members" for older API versions
+            items = data.get("labels") or data.get("members") or []
+            return [m.get("name", "") for m in items if m.get("name")]
+        except Exception as exc:
+            print(f"  {yellow('[WARN]')} Could not fetch labels for {resource_uri}: {exc}",
+                  file=sys.stderr)
             return []
 
     def logout(self) -> None:
