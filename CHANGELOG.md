@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-06-24
+
+### Fixed
+- 400 error (`dcim_device_unique_name_site_tenant` constraint violation) when site or tenant changed; device lookup now tries an exact (name, site, tenant) match first, only falling back to name-only search to locate a device to move — preventing collisions with an already-existing record at the target location
+
 ## [1.2.2] - 2026-06-24
 
 ### Changed
