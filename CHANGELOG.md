@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.9] - 2026-06-24
+
+### Added
+- `--verbose` now activates label fetch diagnostics: for each device it prints the URL attempted, HTTP status code, and (when empty or failed) the raw response body and keys — allows identifying the correct OneView labels endpoint and response format without guessing
+
 ## [1.3.8] - 2026-06-24
 
 ### Changed

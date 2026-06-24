@@ -165,7 +165,7 @@ class OneViewClient:
     def get_server_hardware(self) -> list:
         return self._get_all("/rest/server-hardware")
 
-    def get_resource_labels(self, resource_uri: str) -> list:
+    def get_resource_labels(self, resource_uri: str, debug: bool = False) -> list:
         """Return label names assigned to a resource URI."""
         if not resource_uri:
             return []
@@ -181,13 +181,24 @@ class OneViewClient:
         for url in urls:
             try:
                 resp = self.session.get(url, timeout=30)
+                if debug:
+                    print(f"  {cyan('[DEBUG-LABELS]')} {resp.status_code} {url}",
+                          file=sys.stderr)
                 if not resp.ok:
+                    if debug:
+                        print(f"                 body: {resp.text[:300]}", file=sys.stderr)
                     continue
                 data = resp.json()
                 items = data.get("labels") or data.get("members") or []
+                if debug and not items:
+                    print(f"                 keys: {list(data.keys())}  "
+                          f"body: {resp.text[:300]}", file=sys.stderr)
                 if items:
                     return [m.get("name", "") for m in items if m.get("name")]
-            except Exception:
+            except Exception as exc:
+                if debug:
+                    print(f"  {cyan('[DEBUG-LABELS]')} error for {url}: {exc}",
+                          file=sys.stderr)
                 continue
         return []
 
@@ -878,7 +889,7 @@ def main() -> None:
         stats: dict = {"created": 0, "updated": 0, "unchanged": 0, "skipped": 0, "errors": 0}
         for enc in enclosures:
             try:
-                labels = ov.get_resource_labels(enc.get("uri", "")) if use_labels else []
+                labels = ov.get_resource_labels(enc.get("uri", ""), debug=args.verbose) if use_labels else []
                 if use_labels and labels:
                     print(f"  {cyan('[LABELS]')} {enc.get('name', '?')}: {', '.join(labels)}")
                 action, device = syncer.sync_enclosure(enc, labels=labels)
@@ -907,7 +918,7 @@ def main() -> None:
         stats = {"created": 0, "updated": 0, "unchanged": 0, "skipped": 0, "errors": 0}
         for server in servers:
             try:
-                labels = ov.get_resource_labels(server.get("uri", "")) if use_labels else []
+                labels = ov.get_resource_labels(server.get("uri", ""), debug=args.verbose) if use_labels else []
                 if use_labels and labels:
                     raw = (server.get("serverName") or server.get("name") or "?").split(".")[0]
                     print(f"  {cyan('[LABELS]')} {raw}: {', '.join(labels)}")
