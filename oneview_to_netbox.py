@@ -201,10 +201,10 @@ class NetBoxSync:
         self,
         url: str,
         token: str,
-        site_name: str,
-        chassis_role: str,
-        server_role: str,
-        tenant_name: Optional[str] = None,
+        site_name: str = "Unknown",
+        chassis_role: str = "Chassis",
+        server_role: str = "Server",
+        tenant_name: str = "Unknown",
         device_types_file: Optional[str] = None,
         label_site: bool = False,
         label_tenant: bool = False,
@@ -233,7 +233,7 @@ class NetBoxSync:
             sys.exit(f"Cannot reach NetBox: {exc}")
 
         self._site   = self._require_site(site_name)
-        self._tenant = self._resolve_tenant(tenant_name) if tenant_name else None
+        self._tenant = self._resolve_tenant(tenant_name)
 
     # ---- helpers -----------------------------------------------------------
 
@@ -246,14 +246,24 @@ class NetBoxSync:
             sites = list(self.nb.dcim.sites.filter(**filt))
             if sites:
                 return sites[0]
-        sys.exit(f"Site '{name}' not found in NetBox. Create it first.")
+        if self.dry_run:
+            print(f"  {yellow('[DRY-RUN]')} would create Site: {name}")
+            return _Stub(name=name, slug=self._slugify(name))
+        site = self.nb.dcim.sites.create(name=name, slug=self._slugify(name))
+        print(f"  {green('[CREATED]')} Site: {name}")
+        return site
 
     def _resolve_tenant(self, name: str):
         for filt in ({"name": name}, {"slug": self._slugify(name)}):
             tenants = list(self.nb.tenancy.tenants.filter(**filt))
             if tenants:
                 return tenants[0]
-        sys.exit(f"Tenant '{name}' not found in NetBox. Create it first.")
+        if self.dry_run:
+            print(f"  {yellow('[DRY-RUN]')} would create Tenant: {name}")
+            return _Stub(name=name, slug=self._slugify(name))
+        tenant = self.nb.tenancy.tenants.create(name=name, slug=self._slugify(name))
+        print(f"  {green('[CREATED]')} Tenant: {name}")
+        return tenant
 
     def _find_site(self, name: str):
         """Look up a site by name/slug; return None silently if not found."""
@@ -441,6 +451,10 @@ class NetBoxSync:
         if not uri:
             return "skipped", None
 
+        if name in self._seen_chassis_names:
+            print(f"  {yellow('[WARN]')} Duplicate chassis name '{name}' — skipping")
+            return "skipped", None
+
         site_override, tenant_override = self._apply_labels(labels or [])
         site   = site_override   or self._site
         tenant = tenant_override or self._tenant
@@ -456,7 +470,7 @@ class NetBoxSync:
             "site":        site.id,
             "serial":      serial,
             "status":      "active",
-            "tenant":      tenant.id if tenant else None,
+            "tenant":      tenant.id,
         }
 
         existing = list(self.nb.dcim.devices.filter(name=name, site_id=site.id))
@@ -526,6 +540,9 @@ class NetBoxSync:
         if not name:
             return "skipped", None
 
+        if name in self._seen_server_names:
+            print(f"  {yellow('[WARN]')} Duplicate server name '{name}' — skipping")
+            return "skipped", None
         self._seen_server_names.add(name)
         is_blade  = bool(location_uri and position is not None)
         if is_blade and location_uri not in self._enclosure_uri_map:
@@ -548,7 +565,7 @@ class NetBoxSync:
             "site":        site.id,
             "serial":      serial,
             "status":      nb_status,
-            "tenant":      tenant.id if tenant else None,
+            "tenant":      tenant.id,
         }
 
         existing = list(self.nb.dcim.devices.filter(name=name, site_id=site.id))
@@ -672,10 +689,10 @@ def build_parser() -> argparse.ArgumentParser:
     g = p.add_argument_group("NetBox")
     g.add_argument("--netbox-url", required=True, help="NetBox base URL (no trailing slash)")
     g.add_argument("--token",      required=True, help="NetBox API token")
-    g.add_argument("--site",       required=True,
-                   help="NetBox site name (must already exist) where devices will be placed")
-    g.add_argument("--tenant",     default=None,
-                   help="NetBox tenant name or slug to assign to synced devices (optional)")
+    g.add_argument("--site",   default="Unknown",
+                   help="NetBox site name for devices (default: Unknown, auto-created if needed)")
+    g.add_argument("--tenant", default="Unknown",
+                   help="NetBox tenant name for devices (default: Unknown, auto-created if needed)")
 
     g = p.add_argument_group("Device types")
     g.add_argument("--device-types-file", default=None, metavar="FILE",
@@ -780,8 +797,7 @@ def main() -> None:
         dry_run=args.dry_run,
     )
     use_labels = args.label_site or args.label_tenant
-    tenant_str = f"  tenant: {syncer._tenant.name}" if syncer._tenant else ""
-    print(f"  Connected  (site: {syncer._site.name}{tenant_str})")
+    print(f"  Connected  (site: {syncer._site.name}  tenant: {syncer._tenant.name})")
 
     # ---- Enclosures ---------------------------------------------------------
     if not args.skip_chassis:
