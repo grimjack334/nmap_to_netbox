@@ -98,25 +98,21 @@ pip install pynetbox requests
 ### Usage
 
 ```bash
-# Labels only — site and tenant resolved entirely from OneView labels
+# Labels resolve site and tenant automatically from OneView
 python oneview_to_netbox.py \
     --oneview-host  https://oneview.example.com \
     --oneview-user  Administrator \
     --netbox-url    https://netbox.example.com \
-    --token         YOUR_API_TOKEN \
-    --label-site \
-    --label-tenant
+    --token         YOUR_API_TOKEN
 
-# Explicit fallback — labels override per device; unmatched devices use defaults
+# Explicit fallback — unmatched devices use defaults instead of being skipped
 python oneview_to_netbox.py \
     --oneview-host  https://oneview.example.com \
     --oneview-user  Administrator \
     --netbox-url    https://netbox.example.com \
     --token         YOUR_API_TOKEN \
     --site          default-dc \
-    --tenant        default-tenant \
-    --label-site \
-    --label-tenant
+    --tenant        default-tenant
 
 # Password is prompted securely if --oneview-password is omitted
 
@@ -146,8 +142,8 @@ python oneview_to_netbox.py ... --dry-run
 | `--chassis-role` | `Chassis` | DeviceRole name for enclosures |
 | `--server-role` | `Server` | DeviceRole name for servers |
 | `--device-types-file` | — | YAML file mapping OneView model names to NetBox DeviceType definitions |
-| `--label-site` | off | Resolve site per device from OneView labels matched against NetBox site names/slugs |
-| `--label-tenant` | off | Resolve tenant per device from OneView labels matched against NetBox tenant names/slugs |
+| `--no-label-site` | off | Disable per-device site resolution from OneView labels |
+| `--no-label-tenant` | off | Disable per-device tenant resolution from OneView labels |
 | `--chassis-filter NAME …` | — | Only sync chassis whose name contains one of these strings (case-insensitive) |
 | `--server-filter NAME …` | — | Only sync servers whose name contains one of these strings (case-insensitive) |
 | `--skip-chassis` | off | Skip enclosure sync |
@@ -161,18 +157,21 @@ python oneview_to_netbox.py ... --dry-run
 
 Site and tenant are resolved per device in this order:
 
-1. **Label** (if `--label-site` / `--label-tenant` is set) — each OneView label is matched against NetBox site/tenant names and slugs; first match wins
+1. **Label** (on by default) — each OneView label is matched against NetBox site/tenant names and slugs; first match wins
 2. **Global default** (if `--site` / `--tenant` is provided) — used when no label matches
 3. **Unresolved** — if neither label nor default provides a value, the device is **skipped with a warning** naming the missing field(s)
 
 `--site` and `--tenant` are never auto-created; they must already exist in NetBox. Providing a value that doesn't exist exits with an error.
 
 ```bash
-# All devices must have a matching label or they are skipped
-python oneview_to_netbox.py ... --label-site --label-tenant
+# Labels resolve site and tenant; devices with no matching label are skipped
+python oneview_to_netbox.py ...
 
 # Devices without a matching label fall back to default-dc / default-tenant
-python oneview_to_netbox.py ... --site default-dc --tenant default-tenant --label-site --label-tenant
+python oneview_to_netbox.py ... --site default-dc --tenant default-tenant
+
+# Disable label resolution entirely and use explicit defaults for all devices
+python oneview_to_netbox.py ... --site default-dc --tenant default-tenant --no-label-site --no-label-tenant
 ```
 
 **Label format** — OneView labels are alphanumeric only, so the label name must match the NetBox site or tenant name or slug directly:
@@ -184,7 +183,7 @@ python oneview_to_netbox.py ... --site default-dc --tenant default-tenant --labe
 | `DCWest` | name `DCWest` or slug `dc-west` |
 | `DC1` | name `DC1` or slug `dc1` |
 
-**Debugging labels** — when `--label-site` or `--label-tenant` is active, a `[LABELS]` line is printed for each device showing the labels fetched from OneView:
+**Debugging labels** — a `[LABELS]` line is printed for each device showing the labels fetched from OneView:
 
 ```
   [LABELS] web01: DCWest, ACME
@@ -212,17 +211,6 @@ If no `[LABELS]` line appears for a device, the label fetch returned empty — v
 ```
 
 The `site` and `tenant` fields show the resolved value and its source in parentheses — `label:<name>` when resolved from a OneView label, or `default` when the global `--site`/`--tenant` fallback was used. Unresolved fields are noted here before the skip warning appears.
-
-`--verbose` also activates label fetch diagnostics. For each device it prints the URL attempted, the HTTP status code, and (when the response is empty or an error) the raw response body and keys:
-
-```
-  [DEBUG-LABELS] 200 https://oneview.example.com/rest/labels/resources?resourceUri=/rest/server-hardware/UUID
-                 keys: ['type', 'resourceUri', 'labels', 'uri']  body: {"type":"LabelResourceV2",...}
-  [DEBUG-LABELS] 404 https://oneview.example.com/rest/labels/resources//rest/server-hardware/UUID
-                 body: {"message":"Not Found",...}
-```
-
-Use this output to confirm which endpoint format your OneView version supports and to verify the response structure.
 
 ### Targeted sync
 
