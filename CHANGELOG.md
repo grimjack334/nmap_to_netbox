@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-06-24
+
+### Changed
+- README key options table split into Required and Optional sections; required args (`--oneview-host`, `--oneview-user`, `--netbox-url`, `--token`) now documented
+- `--label-site` / `--label-tenant` descriptions updated to reflect they are the primary resolution mechanism, not just an override
+
 ## [1.3.1] - 2026-06-24
 
 ### Changed
