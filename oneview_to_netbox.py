@@ -165,7 +165,7 @@ class OneViewClient:
     def get_server_hardware(self) -> list:
         return self._get_all("/rest/server-hardware")
 
-    def get_resource_labels(self, resource_uri: str, debug: bool = False) -> list:
+    def get_resource_labels(self, resource_uri: str) -> list:
         """Return label names assigned to a resource URI."""
         if not resource_uri:
             return []
@@ -181,24 +181,13 @@ class OneViewClient:
         for url in urls:
             try:
                 resp = self.session.get(url, timeout=30)
-                if debug:
-                    print(f"  {cyan('[DEBUG-LABELS]')} {resp.status_code} {url}",
-                          file=sys.stderr)
                 if not resp.ok:
-                    if debug:
-                        print(f"                 body: {resp.text[:300]}", file=sys.stderr)
                     continue
                 data = resp.json()
                 items = data.get("labels") or data.get("members") or []
-                if debug and not items:
-                    print(f"                 keys: {list(data.keys())}  "
-                          f"body: {resp.text[:300]}", file=sys.stderr)
                 if items:
                     return [m.get("name", "") for m in items if m.get("name")]
-            except Exception as exc:
-                if debug:
-                    print(f"  {cyan('[DEBUG-LABELS]')} error for {url}: {exc}",
-                          file=sys.stderr)
+            except Exception:
                 continue
         return []
 
@@ -760,11 +749,9 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--netbox-url", required=True, help="NetBox base URL (no trailing slash)")
     g.add_argument("--token",      required=True, help="NetBox API token")
     g.add_argument("--site",   default=None,
-                   help="NetBox site name for devices (must already exist); if omitted, "
-                        "site must be resolved per device via --label-site")
+                   help="NetBox site fallback (must already exist); used when no label resolves a site")
     g.add_argument("--tenant", default=None,
-                   help="NetBox tenant name for devices (must already exist); if omitted, "
-                        "tenant must be resolved per device via --label-tenant")
+                   help="NetBox tenant fallback (must already exist); used when no label resolves a tenant")
 
     g = p.add_argument_group("Device types")
     g.add_argument("--device-types-file", default=None, metavar="FILE",
@@ -778,12 +765,11 @@ def build_parser() -> argparse.ArgumentParser:
                    help="DeviceRole name for servers (default: Server)")
 
     g = p.add_argument_group("Label mappings")
-    g.add_argument("--label-site",   action="store_true",
-                   help="Match device labels against NetBox site names/slugs to override "
-                        "the default site per device")
-    g.add_argument("--label-tenant", action="store_true",
-                   help="Match device labels against NetBox tenant names/slugs to override "
-                        "the default tenant per device")
+    p.set_defaults(label_site=True, label_tenant=True)
+    g.add_argument("--no-label-site",   dest="label_site",   action="store_false",
+                   help="Disable per-device site resolution from OneView labels")
+    g.add_argument("--no-label-tenant", dest="label_tenant", action="store_false",
+                   help="Disable per-device tenant resolution from OneView labels")
 
     g = p.add_argument_group("Behaviour")
     g.add_argument("--no-ssl-verify", action="store_true",
@@ -889,7 +875,7 @@ def main() -> None:
         stats: dict = {"created": 0, "updated": 0, "unchanged": 0, "skipped": 0, "errors": 0}
         for enc in enclosures:
             try:
-                labels = ov.get_resource_labels(enc.get("uri", ""), debug=args.verbose) if use_labels else []
+                labels = ov.get_resource_labels(enc.get("uri", "")) if use_labels else []
                 if use_labels and labels:
                     print(f"  {cyan('[LABELS]')} {enc.get('name', '?')}: {', '.join(labels)}")
                 action, device = syncer.sync_enclosure(enc, labels=labels)
@@ -918,7 +904,7 @@ def main() -> None:
         stats = {"created": 0, "updated": 0, "unchanged": 0, "skipped": 0, "errors": 0}
         for server in servers:
             try:
-                labels = ov.get_resource_labels(server.get("uri", ""), debug=args.verbose) if use_labels else []
+                labels = ov.get_resource_labels(server.get("uri", "")) if use_labels else []
                 if use_labels and labels:
                     raw = (server.get("serverName") or server.get("name") or "?").split(".")[0]
                     print(f"  {cyan('[LABELS]')} {raw}: {', '.join(labels)}")

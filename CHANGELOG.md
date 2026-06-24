@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-06-24
+
+### Changed
+- Label-based site and tenant resolution is now **on by default**; use `--no-label-site` / `--no-label-tenant` to disable
+- Removed `[DEBUG-LABELS]` verbose diagnostic output now that label fetch is confirmed working
+
 ## [1.3.9] - 2026-06-24
 
 ### Added
