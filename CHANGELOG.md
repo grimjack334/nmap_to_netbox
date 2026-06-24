@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-06-24
+
+### Changed
+- `--site` and `--tenant` are now optional; if omitted, site and tenant must be resolved per device via `--label-site` / `--label-tenant`
+- `_require_site` and `_resolve_tenant` no longer auto-create entries; they exit with a clear error if an explicitly provided value is not found in NetBox
+- Startup status line shows `(from labels)` when no global site or tenant default is configured
+
+### Fixed
+- "Unknown" site and tenant entries are no longer silently created in NetBox when values are unresolved
+- Skip warning now names the specific missing field(s): e.g. `site not set` or `site, tenant not set`
+
 ## [1.2.4] - 2026-06-24
 
 ### Changed
