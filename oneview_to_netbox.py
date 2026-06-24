@@ -34,6 +34,7 @@ Usage:
 """
 
 import argparse
+import getpass
 import re
 import sys
 from typing import Optional
@@ -378,6 +379,8 @@ class NetBoxSync:
 
         if not name:
             return "skipped", None
+        if not uri:
+            return "skipped", None
 
         self._seen_chassis_names.add(name)
         dt   = self._get_device_type(model, u_height=10, subdevice_role="parent")
@@ -449,7 +452,8 @@ class NetBoxSync:
 
     def sync_server(self, server: dict) -> tuple:
         """Create or update a server device from OneView server hardware."""
-        name         = (server.get("name") or "").strip()
+        raw_name     = (server.get("serverName") or server.get("name") or "").strip()
+        name         = raw_name.split(".")[0]
         serial       = server.get("serialNumber") or ""
         model        = server.get("model") or server.get("shortModel") or "HPE Server"
         power_state  = server.get("powerState") or "Unknown"
@@ -589,7 +593,8 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--oneview-host",           required=True,
                    help="OneView appliance URL (e.g. https://oneview.example.com)")
     g.add_argument("--oneview-user",           required=True, help="OneView username")
-    g.add_argument("--oneview-password",       required=True, help="OneView password")
+    g.add_argument("--oneview-password",       default=None,
+                   help="OneView password (prompted if omitted)")
     g.add_argument("--oneview-api-version",    type=int, default=None,
                    help="OneView REST API version (default: auto-detect)")
 
@@ -653,13 +658,15 @@ def main() -> None:
     if args.dry_run:
         print(bold("=== DRY RUN — no changes will be written ===\n"))
 
+    password = args.oneview_password or getpass.getpass("OneView password: ")
+
     # Connect to OneView
     print("Connecting to HP OneView …")
     try:
         ov = OneViewClient(
             host=args.oneview_host,
             username=args.oneview_user,
-            password=args.oneview_password,
+            password=password,
             api_version=args.oneview_api_version,
             verify_ssl=not args.no_ssl_verify,
         )
@@ -715,10 +722,12 @@ def main() -> None:
                 stats[action] += 1
                 if not args.dry_run and action != "skipped":
                     colour = green if action == "created" else (yellow if action == "updated" else cyan)
-                    print(f"  {colour(f'[{action.upper()}]')} Server: {server.get('name', '?')}")
+                    display_name = device.name if device else server.get("name", "?")
+                    print(f"  {colour(f'[{action.upper()}]')} Server: {display_name}")
             except Exception as exc:
                 stats["errors"] += 1
-                print(f"  {red('[ERROR]')} Server {server.get('name', '?')}: {exc}", file=sys.stderr)
+                raw = (server.get("serverName") or server.get("name") or "?").split(".")[0]
+                print(f"  {red('[ERROR]')} Server {raw}: {exc}", file=sys.stderr)
 
         _print_stats("Servers", stats)
 
