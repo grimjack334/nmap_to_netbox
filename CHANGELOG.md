@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.6] - 2026-06-24
+
+### Changed
+- README debugging section updated to note that both OneView label endpoint forms are tried automatically; clarified that a `[LABELS]` line with no match means a NetBox name/slug mismatch, not a fetch error
+
 ## [1.3.5] - 2026-06-24
 
 ### Fixed
