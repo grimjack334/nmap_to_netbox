@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.1.7] - 2026-06-24
+
+### Added
+- `--chassis-filter NAME [NAME ...]` and `--server-filter NAME [NAME ...]` to sync only devices whose names contain one of the given strings (case-insensitive); useful for updating a single server or chassis without processing everything
+
 ## [1.1.6] - 2026-06-24
 
 ### Changed
