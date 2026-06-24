@@ -126,17 +126,28 @@ python oneview_to_netbox.py ... --dry-run
 
 ### Key options
 
+**Required**
+
+| Flag | Description |
+|---|---|
+| `--oneview-host` | OneView appliance URL (e.g. `https://oneview.example.com`) |
+| `--oneview-user` | OneView username |
+| `--netbox-url` | NetBox base URL (no trailing slash) |
+| `--token` | NetBox API token |
+
+**Optional**
+
 | Flag | Default | Description |
 |---|---|---|
-| `--oneview-password` | _(prompted)_ | OneView password; prompted via stdin if omitted |
+| `--oneview-password` | _(prompted)_ | OneView password; prompted securely if omitted |
 | `--oneview-api-version` | auto-detect | OneView REST API version |
-| `--site` | — | NetBox site fallback for devices (must already exist); if omitted, site must come from `--label-site` |
-| `--tenant` | — | NetBox tenant fallback for devices (must already exist); if omitted, tenant must come from `--label-tenant` |
+| `--site` | — | NetBox site fallback (must already exist); devices without a label-resolved site use this |
+| `--tenant` | — | NetBox tenant fallback (must already exist); devices without a label-resolved tenant use this |
 | `--chassis-role` | `Chassis` | DeviceRole name for enclosures |
 | `--server-role` | `Server` | DeviceRole name for servers |
 | `--device-types-file` | — | YAML file mapping OneView model names to NetBox DeviceType definitions |
-| `--label-site` | off | Match device labels against NetBox site names/slugs to override the default site |
-| `--label-tenant` | off | Match device labels against NetBox tenant names/slugs to override the default tenant |
+| `--label-site` | off | Resolve site per device from OneView labels matched against NetBox site names/slugs |
+| `--label-tenant` | off | Resolve tenant per device from OneView labels matched against NetBox tenant names/slugs |
 | `--chassis-filter NAME …` | — | Only sync chassis whose name contains one of these strings (case-insensitive) |
 | `--server-filter NAME …` | — | Only sync servers whose name contains one of these strings (case-insensitive) |
 | `--skip-chassis` | off | Skip enclosure sync |
