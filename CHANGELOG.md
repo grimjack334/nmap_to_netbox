@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.7] - 2026-06-24
+
+### Added
+- `--verbose` flag: prints a per-device detail block showing OneView source values (model, serial, power state, blade position) and the resolved NetBox values (site and tenant with source — label name or default — and status); unresolved site/tenant is noted before the skip warning
+
 ## [1.3.6] - 2026-06-24
 
 ### Changed

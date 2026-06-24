@@ -219,8 +219,10 @@ class NetBoxSync:
         label_site: bool = False,
         label_tenant: bool = False,
         dry_run: bool = False,
+        verbose: bool = False,
     ):
         self.dry_run          = dry_run
+        self._verbose         = verbose
         self.chassis_role     = chassis_role
         self.server_role      = server_role
         self.nb               = pynetbox.api(url, token=token)
@@ -483,6 +485,17 @@ class NetBoxSync:
         site   = site_override   or self._site
         tenant = tenant_override or self._tenant
 
+        if self._verbose:
+            src_site   = f"label:{site_override.name}"   if site_override   else "default"
+            src_tenant = f"label:{tenant_override.name}" if tenant_override else "default"
+            print(f"  {cyan('[VERBOSE]')} Chassis: {name}")
+            print(f"    OneView : model={model!r}  serial={serial or '(none)'!r}  bays={bay_count}")
+            if site is not None and tenant is not None:
+                print(f"    NetBox  : site={site.name!r} ({src_site})  tenant={tenant.name!r} ({src_tenant})")
+            else:
+                unresolved = ", ".join(f for f, v in (("site", site), ("tenant", tenant)) if v is None)
+                print(f"    NetBox  : {unresolved} unresolved — will skip")
+
         missing = [f for f, v in (("site", site), ("tenant", tenant)) if v is None]
         if missing:
             print(f"  {yellow('[WARN]')} Chassis '{name}' — {', '.join(missing)} not set — skipping")
@@ -582,12 +595,24 @@ class NetBoxSync:
         site   = site_override   or self._site
         tenant = tenant_override or self._tenant
 
+        nb_status = "active" if power_state == "On" else "offline"
+
+        if self._verbose:
+            src_site   = f"label:{site_override.name}"   if site_override   else "default"
+            src_tenant = f"label:{tenant_override.name}" if tenant_override else "default"
+            kind = f"blade (bay={position})" if is_blade else "rack server"
+            print(f"  {cyan('[VERBOSE]')} Server: {name}  [{kind}]")
+            print(f"    OneView : model={model!r}  serial={serial or '(none)'!r}  power={power_state}")
+            if site is not None and tenant is not None:
+                print(f"    NetBox  : site={site.name!r} ({src_site})  tenant={tenant.name!r} ({src_tenant})  status={nb_status}")
+            else:
+                unresolved = ", ".join(f for f, v in (("site", site), ("tenant", tenant)) if v is None)
+                print(f"    NetBox  : {unresolved} unresolved — will skip")
+
         missing = [f for f, v in (("site", site), ("tenant", tenant)) if v is None]
         if missing:
             print(f"  {yellow('[WARN]')} Server '{name}' — {', '.join(missing)} not set — skipping")
             return "skipped", None
-
-        nb_status = "active" if power_state == "On" else "offline"
         dt        = self._get_device_type(model, u_height=0 if is_blade else 1,
                                            subdevice_role="child" if is_blade else None)
         role      = self._get_device_role(self.server_role)
@@ -768,6 +793,9 @@ def build_parser() -> argparse.ArgumentParser:
                         "Use --dry-run first to preview.")
     g.add_argument("--dry-run",       action="store_true",
                    help="Preview all changes with field-level diffs; nothing is written")
+    g.add_argument("--verbose",       action="store_true",
+                   help="Print per-device detail: OneView source values and resolved NetBox "
+                        "site, tenant, and status")
     return p
 
 
@@ -831,6 +859,7 @@ def main() -> None:
         label_site=args.label_site,
         label_tenant=args.label_tenant,
         dry_run=args.dry_run,
+        verbose=args.verbose,
     )
     use_labels = args.label_site or args.label_tenant
     site_str   = syncer._site.name   if syncer._site   else "(from labels)"
