@@ -155,6 +155,7 @@ python oneview_to_netbox.py ... --dry-run
 | `--delete-missing` | off | Delete NetBox devices absent from OneView (use `--dry-run` first) |
 | `--no-ssl-verify` | off | Disable TLS verification (lab use) |
 | `--dry-run` | off | Show field-level diffs without writing to NetBox |
+| `--verbose` | off | Print per-device detail: OneView source values and resolved NetBox site, tenant, and status |
 
 ### Label-based site/tenant mapping
 
@@ -191,6 +192,26 @@ python oneview_to_netbox.py ... --site default-dc --tenant default-tenant --labe
 ```
 
 If no `[LABELS]` line appears for a device, the label fetch returned empty — verify that labels are assigned to the device in OneView. The script automatically tries both endpoint forms used by different OneView versions (query-param and path-based), so no manual configuration is needed. If the `[LABELS]` line appears but the device is still skipped, the label value does not match any NetBox site or tenant name/slug — check the exact name and slug of the site/tenant in NetBox and ensure the OneView label matches one of them.
+
+### Verbose output
+
+`--verbose` prints a two-line detail block per device showing the raw OneView values and the resolved NetBox values before any write is attempted:
+
+```
+  [VERBOSE] Chassis: encl-a
+    OneView : model='HPE Synergy 12000 Frame'  serial='SGH123456'  bays=12
+    NetBox  : site='London' (label:London)  tenant='ACME' (default)
+
+  [VERBOSE] Server: web01  [blade (bay=3)]
+    OneView : model='HPE ProLiant BL460c Gen10'  serial='ABC123'  power=On
+    NetBox  : site='London' (label:London)  tenant='ACME' (default)  status=active
+
+  [VERBOSE] Server: db02  [rack server]
+    OneView : model='HPE ProLiant DL380 Gen10'  serial='(none)'  power=Off
+    NetBox  : site unresolved — will skip
+```
+
+The `site` and `tenant` fields show the resolved value and its source in parentheses — `label:<name>` when resolved from a OneView label, or `default` when the global `--site`/`--tenant` fallback was used. Unresolved fields are noted here before the skip warning appears.
 
 ### Targeted sync
 
