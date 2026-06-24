@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.8] - 2026-06-24
+
+### Changed
+- README updated to document `--verbose` flag in the options table and added a "Verbose output" section with annotated example output
+
 ## [1.3.7] - 2026-06-24
 
 ### Added
