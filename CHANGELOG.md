@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-06-24
+
+### Added
+- Rack sync: OneView racks are created/updated in NetBox (`dcim.racks`) with name, serial, U-height, site, and tenant resolved the same way as devices
+- Rack device positions: after devices are synced a second pass places each device into its rack slot using OneView `rackMounts` data; `topUSlot` is converted to NetBox bottom-U position
+- `--skip-racks` flag to bypass rack sync
+- `--rack-filter NAME …` to limit rack sync to racks whose name contains one of the given strings (case-insensitive)
+- Server hardware URIs are now tracked internally so rack position assignment works for both rack servers and enclosures
+
 ## [1.4.1] - 2026-06-24
 
 ### Changed

@@ -165,6 +165,9 @@ class OneViewClient:
     def get_server_hardware(self) -> list:
         return self._get_all("/rest/server-hardware")
 
+    def get_racks(self) -> list:
+        return self._get_all("/rest/racks")
+
     def get_resource_labels(self, resource_uri: str) -> list:
         """Return label names assigned to a resource URI."""
         if not resource_uri:
@@ -233,8 +236,12 @@ class NetBoxSync:
         self._device_types: dict            = {}   # slug → object
         self._device_roles: dict            = {}   # slug → object
         self._enclosure_uri_map: dict       = {}   # OV uri → nb device
+        self._server_uri_map: dict          = {}   # OV uri → nb device
+        self._rack_uri_map: dict            = {}   # OV uri → nb rack
+        self._rack_mounts_data: list        = []   # (ov_rack, nb_rack) for position pass
         self._seen_chassis_names: set       = set()
         self._seen_server_names: set        = set()
+        self._seen_rack_names: set          = set()
         self._site_cache: dict              = {}   # name → site object
         self._tenant_cache: dict            = {}   # name → tenant object
         self._type_defs: list               = self._load_type_defs(device_types_file) if device_types_file else []
@@ -458,6 +465,34 @@ class NetBoxSync:
 
         return changes
 
+    def _diff_rack(self, existing, desired: dict) -> list:
+        changes = []
+
+        cur_serial = existing.serial or ""
+        new_serial = desired.get("serial", "")
+        if new_serial and cur_serial != new_serial:
+            changes.append(f"    serial: {red(repr(cur_serial))} → {green(repr(new_serial))}")
+
+        cur_u = existing.u_height
+        new_u = desired.get("u_height")
+        if new_u and cur_u != new_u:
+            changes.append(f"    u_height: {red(str(cur_u))} → {green(str(new_u))}")
+
+        new_site_id = desired.get("site")
+        cur_site_id = existing.site.id if existing.site else None
+        if new_site_id != cur_site_id:
+            cur_label = str(existing.site) if existing.site else "None"
+            changes.append(f"    site: {red(cur_label)} → {green(str(new_site_id))}")
+
+        new_tenant_id = desired.get("tenant")
+        cur_tenant_id = existing.tenant.id if existing.tenant else None
+        if new_tenant_id != cur_tenant_id:
+            cur_label = str(existing.tenant) if existing.tenant else "None"
+            new_label = str(new_tenant_id) if new_tenant_id else "None"
+            changes.append(f"    tenant: {red(cur_label)} → {green(new_label)}")
+
+        return changes
+
     # ---- enclosure sync ----------------------------------------------------
 
     def sync_enclosure(self, enc: dict, labels: list = None) -> tuple:
@@ -662,6 +697,10 @@ class NetBoxSync:
         if is_blade:
             self._link_blade_to_bay(device, location_uri, int(position))
 
+        server_uri = server.get("uri", "")
+        if server_uri:
+            self._server_uri_map[server_uri] = device
+
         return action, device
 
     def _link_blade_to_bay(
@@ -686,6 +725,122 @@ class NetBoxSync:
         if bay.installed_device is None or bay.installed_device.id != blade.id:
             bay.update({"installed_device": blade.id})
             print(f"    {green('[BAY LINKED]')} {blade.name} → {chassis.name} {bay_name}")
+
+    # ---- rack sync ---------------------------------------------------------
+
+    def sync_rack(self, rack: dict, labels: list = None) -> tuple:
+        """Create or update a rack from a OneView rack resource."""
+        name     = (rack.get("name") or "").strip()
+        serial   = rack.get("serialNumber") or ""
+        u_height = rack.get("unitHeight") or 42
+        uri      = rack.get("uri") or ""
+
+        if not name:
+            return "skipped", None
+
+        if name in self._seen_rack_names:
+            print(f"  {yellow('[WARN]')} Duplicate rack name '{name}' — skipping")
+            return "skipped", None
+
+        site_override, tenant_override = self._apply_labels(labels or [])
+        site   = site_override   or self._site
+        tenant = tenant_override or self._tenant
+
+        if self._verbose:
+            src_site   = f"label:{site_override.name}"   if site_override   else "default"
+            src_tenant = f"label:{tenant_override.name}" if tenant_override else "default"
+            print(f"  {cyan('[VERBOSE]')} Rack: {name}")
+            print(f"    OneView : serial={serial or '(none)'!r}  u_height={u_height}")
+            if site is not None and tenant is not None:
+                print(f"    NetBox  : site={site.name!r} ({src_site})  tenant={tenant.name!r} ({src_tenant})")
+            else:
+                unresolved = ", ".join(f for f, v in (("site", site), ("tenant", tenant)) if v is None)
+                print(f"    NetBox  : {unresolved} unresolved — will skip")
+
+        missing = [f for f, v in (("site", site), ("tenant", tenant)) if v is None]
+        if missing:
+            print(f"  {yellow('[WARN]')} Rack '{name}' — {', '.join(missing)} not set — skipping")
+            return "skipped", None
+
+        self._seen_rack_names.add(name)
+
+        payload: dict = {
+            "name":     name,
+            "site":     site.id,
+            "serial":   serial,
+            "u_height": u_height,
+            "status":   "active",
+        }
+        if tenant:
+            payload["tenant"] = tenant.id
+
+        existing = list(self.nb.dcim.racks.filter(name=name, site_id=site.id))
+
+        if self.dry_run:
+            if existing:
+                changes = self._diff_rack(existing[0], payload)
+                if changes:
+                    print(f"  {yellow('[DRY-RUN UPDATE]')} Rack: {bold(name)}")
+                    for c in changes:
+                        print(c)
+                    return "updated", None
+                print(f"  {cyan('[DRY-RUN NO CHANGE]')} Rack: {name}")
+                return "unchanged", None
+            print(f"  {green('[DRY-RUN CREATE]')} Rack: {bold(name)}"
+                  f"  serial={serial}  u_height={u_height}")
+            return "created", None
+
+        if existing:
+            nb_rack = existing[0]
+            changes = self._diff_rack(nb_rack, payload)
+            if changes:
+                nb_rack.update(payload)
+                action = "updated"
+            else:
+                action = "unchanged"
+        else:
+            nb_rack = self.nb.dcim.racks.create(**payload)
+            action = "created"
+
+        if uri:
+            self._rack_uri_map[uri] = nb_rack
+            self._rack_mounts_data.append((rack, nb_rack))
+
+        return action, nb_rack
+
+    def _update_rack_positions(self) -> dict:
+        """Assign devices to rack slots based on OneView rackMounts data."""
+        stats = {"updated": 0, "skipped": 0, "errors": 0}
+        for ov_rack, nb_rack in self._rack_mounts_data:
+            for mount in ov_rack.get("rackMounts", []):
+                mount_uri = mount.get("mountUri", "")
+                top_u     = mount.get("topUSlot")
+                u_height  = mount.get("uHeight")
+
+                device = (
+                    self._enclosure_uri_map.get(mount_uri)
+                    or self._server_uri_map.get(mount_uri)
+                )
+                if device is None:
+                    stats["skipped"] += 1
+                    continue
+
+                # OneView topUSlot is the highest occupied U; NetBox position is the lowest
+                position = (top_u - u_height + 1) if (top_u and u_height) else None
+                update_payload = {"rack": nb_rack.id, "face": "front"}
+                if position:
+                    update_payload["position"] = position
+
+                pos_str = f"  position={position}" if position else ""
+                try:
+                    device.update(update_payload)
+                    print(f"    {green('[RACK PLACED]')} {device.name} → {nb_rack.name}{pos_str}")
+                    stats["updated"] += 1
+                except Exception as exc:
+                    stats["errors"] += 1
+                    print(f"    {red('[ERROR]')} rack position {device.name}: {exc}",
+                          file=sys.stderr)
+        return stats
 
     # ---- delete missing ----------------------------------------------------
 
@@ -774,10 +929,15 @@ def build_parser() -> argparse.ArgumentParser:
     g = p.add_argument_group("Behaviour")
     g.add_argument("--no-ssl-verify", action="store_true",
                    help="Disable TLS certificate verification for OneView (lab use)")
+    g.add_argument("--skip-racks",    action="store_true",
+                   help="Skip rack sync")
     g.add_argument("--skip-chassis",  action="store_true",
                    help="Skip enclosure/chassis sync")
     g.add_argument("--skip-servers",  action="store_true",
                    help="Skip server hardware sync")
+    g.add_argument("--rack-filter",    nargs="+", metavar="NAME", default=None,
+                   help="Only sync racks whose name contains one of these strings "
+                        "(case-insensitive); all others are skipped")
     g.add_argument("--chassis-filter", nargs="+", metavar="NAME", default=None,
                    help="Only sync chassis whose name contains one of these strings "
                         "(case-insensitive); all others are skipped")
@@ -863,6 +1023,32 @@ def main() -> None:
     tenant_str = syncer._tenant.name if syncer._tenant else "(from labels)"
     print(f"  Connected  (site: {site_str}  tenant: {tenant_str})")
 
+    # ---- Racks --------------------------------------------------------------
+    if not args.skip_racks:
+        print("\nFetching racks from OneView …")
+        racks = ov.get_racks()
+        if args.rack_filter:
+            racks = [r for r in racks
+                     if _name_matches(r.get("name") or "", args.rack_filter)]
+        print(f"  Found {len(racks)} rack(s)\n")
+
+        stats: dict = {"created": 0, "updated": 0, "unchanged": 0, "skipped": 0, "errors": 0}
+        for rack in racks:
+            try:
+                labels = ov.get_resource_labels(rack.get("uri", "")) if use_labels else []
+                if use_labels and labels:
+                    print(f"  {cyan('[LABELS]')} {rack.get('name', '?')}: {', '.join(labels)}")
+                action, nb_rack = syncer.sync_rack(rack, labels=labels)
+                stats[action] += 1
+                if not args.dry_run and action != "skipped":
+                    colour = green if action == "created" else (yellow if action == "updated" else cyan)
+                    print(f"  {colour(f'[{action.upper()}]')} Rack: {rack.get('name', '?')}")
+            except Exception as exc:
+                stats["errors"] += 1
+                print(f"  {red('[ERROR]')} Rack {rack.get('name', '?')}: {exc}", file=sys.stderr)
+
+        _print_stats("Racks", stats)
+
     # ---- Enclosures ---------------------------------------------------------
     if not args.skip_chassis:
         print("\nFetching enclosures from OneView …")
@@ -920,6 +1106,17 @@ def main() -> None:
                 print(f"  {red('[ERROR]')} Server {raw}: {exc}", file=sys.stderr)
 
         _print_stats("Servers", stats)
+
+    # ---- Rack positions -----------------------------------------------------
+    if not args.skip_racks and syncer._rack_mounts_data:
+        print("\nUpdating rack device positions …")
+        pos_stats = syncer._update_rack_positions()
+        print(
+            f"\nRack positions summary — "
+            f"Updated: {pos_stats['updated']}  "
+            f"Skipped: {pos_stats['skipped']}  "
+            f"Errors: {pos_stats['errors']}"
+        )
 
     # ---- Deletions (servers before chassis to cleanly vacate device bays) ----
     if args.delete_missing:
