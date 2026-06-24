@@ -81,11 +81,13 @@ python scan_tagged_prefixes.py \
 
 ## OneView → NetBox (`oneview_to_netbox.py`)
 
-Syncs HP OneView enclosures and server hardware into NetBox as Device records.
+Syncs HP OneView racks, enclosures, and server hardware into NetBox.
 
+- Racks → NetBox rack records with serial, U-height, site, and tenant
 - Enclosures → chassis Devices with DeviceBays for each blade slot
 - Blade servers linked to their parent chassis DeviceBay
 - Rack servers created as standalone Devices
+- Devices placed into rack slots after sync using OneView rack mount data
 - Auto-creates Manufacturers, DeviceTypes, and DeviceRoles as needed
 - Site and tenant resolved per device from OneView labels; devices with either field unresolved are skipped
 
@@ -144,8 +146,10 @@ python oneview_to_netbox.py ... --dry-run
 | `--device-types-file` | — | YAML file mapping OneView model names to NetBox DeviceType definitions |
 | `--no-label-site` | off | Disable per-device site resolution from OneView labels |
 | `--no-label-tenant` | off | Disable per-device tenant resolution from OneView labels |
+| `--rack-filter NAME …` | — | Only sync racks whose name contains one of these strings (case-insensitive) |
 | `--chassis-filter NAME …` | — | Only sync chassis whose name contains one of these strings (case-insensitive) |
 | `--server-filter NAME …` | — | Only sync servers whose name contains one of these strings (case-insensitive) |
+| `--skip-racks` | off | Skip rack sync |
 | `--skip-chassis` | off | Skip enclosure sync |
 | `--skip-servers` | off | Skip server hardware sync |
 | `--delete-missing` | off | Delete NetBox devices absent from OneView (use `--dry-run` first) |
@@ -197,6 +201,10 @@ If no `[LABELS]` line appears for a device, the label fetch returned empty — v
 `--verbose` prints a two-line detail block per device showing the raw OneView values and the resolved NetBox values before any write is attempted:
 
 ```
+  [VERBOSE] Rack: rack-01
+    OneView : serial='SGH000001'  u_height=42
+    NetBox  : site='London' (label:London)  tenant='ACME' (default)
+
   [VERBOSE] Chassis: encl-a
     OneView : model='HPE Synergy 12000 Frame'  serial='SGH123456'  bays=12
     NetBox  : site='London' (label:London)  tenant='ACME' (default)
@@ -214,9 +222,12 @@ The `site` and `tenant` fields show the resolved value and its source in parenth
 
 ### Targeted sync
 
-Use `--chassis-filter` and `--server-filter` to limit a run to specific devices by name (case-insensitive substring match). Multiple values are OR'd together.
+Use `--rack-filter`, `--chassis-filter`, and `--server-filter` to limit a run to specific items by name (case-insensitive substring match). Multiple values are OR'd together.
 
 ```bash
+# Update a single rack
+python oneview_to_netbox.py ... --rack-filter rack-01
+
 # Update a single server
 python oneview_to_netbox.py ... --server-filter web01
 
@@ -230,9 +241,11 @@ python oneview_to_netbox.py ... --server-filter db01 db02 --chassis-filter encl-
 ### Behaviour
 
 - **Idempotent** — safe to run repeatedly; changed records are updated in place, unchanged records are skipped.
+- **Sync order** — racks are synced first, then enclosures, then servers; device rack positions are assigned last once all records exist.
+- **Rack positions** — after devices are synced, each device is placed into its rack slot using OneView `rackMounts` data; `topUSlot` is converted to NetBox bottom-U position automatically.
 - **Site/tenant changes** — if a label changes a device's site or tenant, the existing NetBox record is updated in place. The lookup tries an exact (name, site, tenant) match first; if not found it searches by name only to locate the record to move, avoiding constraint violations.
-- **Unresolved site or tenant** — devices where either field cannot be resolved (no label match and no `--site`/`--tenant` default) are skipped with a warning naming the specific missing field(s), e.g. `site not set` or `site, tenant not set`.
+- **Unresolved site or tenant** — racks and devices where either field cannot be resolved (no label match and no `--site`/`--tenant` default) are skipped with a warning naming the specific missing field(s), e.g. `site not set` or `site, tenant not set`.
 - **Server names** — uses the OS hostname (`serverName`) in preference to the OneView inventory name; domain suffixes are stripped.
-- **Unique names enforced** — duplicate server or chassis names (after domain-stripping) are skipped with a warning.
+- **Unique names enforced** — duplicate rack, server, or chassis names are skipped with a warning.
 - **Chassis skip** — enclosures without a URI and blade servers whose chassis wasn't synced are skipped automatically.
 - **Field-level diffs** — dry-run shows exactly which fields would change (including site and tenant), with ANSI colour output in a TTY.
