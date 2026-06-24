@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-06-24
+
+### Changed
+- README updated to document in-place site/tenant updates, unresolved field skipping behaviour, and clarified label-based mapping section
+
 ## [1.2.0] - 2026-06-24
 
 ### Fixed
