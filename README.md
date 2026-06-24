@@ -124,6 +124,8 @@ python oneview_to_netbox.py ... --dry-run
 | `--device-types-file` | — | YAML file mapping OneView model names to NetBox DeviceType definitions |
 | `--label-site` | off | Match device labels against NetBox site names/slugs to override the default site |
 | `--label-tenant` | off | Match device labels against NetBox tenant names/slugs to override the default tenant |
+| `--chassis-filter NAME …` | — | Only sync chassis whose name contains one of these strings (case-insensitive) |
+| `--server-filter NAME …` | — | Only sync servers whose name contains one of these strings (case-insensitive) |
 | `--skip-chassis` | off | Skip enclosure sync |
 | `--skip-servers` | off | Skip server hardware sync |
 | `--delete-missing` | off | Delete NetBox devices absent from OneView (use `--dry-run` first) |
@@ -144,6 +146,21 @@ python oneview_to_netbox.py ... \
 ```
 
 Note: OneView labels are alphanumeric only, so the label name itself must match the NetBox site or tenant name/slug.
+
+### Targeted sync
+
+Use `--chassis-filter` and `--server-filter` to limit a run to specific devices by name (case-insensitive substring match). Multiple values are OR'd together.
+
+```bash
+# Update a single server
+python oneview_to_netbox.py ... --server-filter web01
+
+# Update all chassis whose name contains "blade"
+python oneview_to_netbox.py ... --chassis-filter blade
+
+# Update specific servers and a specific chassis in one run
+python oneview_to_netbox.py ... --server-filter db01 db02 --chassis-filter encl-a
+```
 
 ### Behaviour
 
