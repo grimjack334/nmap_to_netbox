@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-06-24
+
+### Added
+- `--oneview-password` is now optional; the script prompts securely via `getpass` when omitted
+
+### Changed
+- Server names now use the `serverName` field (OS hostname) instead of the OneView inventory name
+- Server names have any domain suffix stripped, keeping only the short hostname
+- Chassis/enclosures with no URI defined in OneView are skipped instead of partially processed
+
 ## [1.1.2] - 2026-06-12
 
 ### Fixed
