@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.5] - 2026-06-24
+
+### Fixed
+- Labels were never returned because `requests` percent-encodes query parameters — `/rest/server-hardware/UUID` became `%2Frest%2Fserver-hardware%2FUUID` which OneView did not recognise; query param is now embedded directly in the URL string to preserve literal slashes
+- Path-based endpoint form (`/rest/labels/resources//rest/server-hardware/UUID`) added as a fallback for OneView versions that do not support the query-param form
+
 ## [1.3.4] - 2026-06-24
 
 ### Changed

@@ -169,21 +169,27 @@ class OneViewClient:
         """Return label names assigned to a resource URI."""
         if not resource_uri:
             return []
-        try:
-            resp = self.session.get(
-                f"{self.base_url}/rest/labels/resources",
-                params={"resourceUri": resource_uri},
-                timeout=30,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            # OneView returns {"labels": [...]}; fall back to "members" for older API versions
-            items = data.get("labels") or data.get("members") or []
-            return [m.get("name", "") for m in items if m.get("name")]
-        except Exception as exc:
-            print(f"  {yellow('[WARN]')} Could not fetch labels for {resource_uri}: {exc}",
-                  file=sys.stderr)
-            return []
+        # Try two endpoint formats used by different OneView versions.
+        # Slashes in the URI must not be percent-encoded, so we embed the
+        # query param directly in the URL string rather than using params=.
+        urls = [
+            # Query-param form (unencoded slashes)
+            f"{self.base_url}/rest/labels/resources?resourceUri={resource_uri}",
+            # Path form: /rest/labels/resources//rest/server-hardware/UUID
+            f"{self.base_url}/rest/labels/resources/{resource_uri}",
+        ]
+        for url in urls:
+            try:
+                resp = self.session.get(url, timeout=30)
+                if not resp.ok:
+                    continue
+                data = resp.json()
+                items = data.get("labels") or data.get("members") or []
+                if items:
+                    return [m.get("name", "") for m in items if m.get("name")]
+            except Exception:
+                continue
+        return []
 
     def logout(self) -> None:
         try:
