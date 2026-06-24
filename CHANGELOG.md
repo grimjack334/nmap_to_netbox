@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.1.8] - 2026-06-24
+
+### Added
+- Duplicate server and chassis names are now detected and skipped with a warning rather than creating conflicting NetBox records
+
+### Changed
+- `--site` and `--tenant` now default to `Unknown` and are no longer required; both are auto-created in NetBox if they don't already exist
+- Site and tenant are always assigned to every synced device; OneView labels override the defaults per device
+
 ## [1.1.7] - 2026-06-24
 
 ### Added
