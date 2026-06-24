@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-06-24
+
+### Changed
+- Blade servers whose `locationUri` does not match a synced chassis are now skipped instead of being created without a DeviceBay link
+
 ## [1.1.3] - 2026-06-24
 
 ### Added
