@@ -191,7 +191,7 @@ python oneview_to_netbox.py ... --site default-dc --tenant default-tenant --labe
   [LABELS] encl-a: London
 ```
 
-If no `[LABELS]` line appears for a device, the label fetch returned empty — verify that labels are assigned to the device in OneView. The script automatically tries both endpoint forms used by different OneView versions (query-param and path-based), so no manual configuration is needed. If the `[LABELS]` line appears but the device is still skipped, the label value does not match any NetBox site or tenant name/slug — check the exact name and slug of the site/tenant in NetBox and ensure the OneView label matches one of them.
+If no `[LABELS]` line appears for a device, the label fetch returned empty — verify that labels are assigned to the device in OneView. If the `[LABELS]` line appears but the device is still skipped, the label value does not match any NetBox site or tenant name/slug — check the exact name and slug of the site/tenant in NetBox and ensure the OneView label matches one of them.
 
 ### Verbose output
 
@@ -212,6 +212,17 @@ If no `[LABELS]` line appears for a device, the label fetch returned empty — v
 ```
 
 The `site` and `tenant` fields show the resolved value and its source in parentheses — `label:<name>` when resolved from a OneView label, or `default` when the global `--site`/`--tenant` fallback was used. Unresolved fields are noted here before the skip warning appears.
+
+`--verbose` also activates label fetch diagnostics. For each device it prints the URL attempted, the HTTP status code, and (when the response is empty or an error) the raw response body and keys:
+
+```
+  [DEBUG-LABELS] 200 https://oneview.example.com/rest/labels/resources?resourceUri=/rest/server-hardware/UUID
+                 keys: ['type', 'resourceUri', 'labels', 'uri']  body: {"type":"LabelResourceV2",...}
+  [DEBUG-LABELS] 404 https://oneview.example.com/rest/labels/resources//rest/server-hardware/UUID
+                 body: {"message":"Not Found",...}
+```
+
+Use this output to confirm which endpoint format your OneView version supports and to verify the response structure.
 
 ### Targeted sync
 
