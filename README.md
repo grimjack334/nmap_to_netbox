@@ -134,13 +134,15 @@ python oneview_to_netbox.py ... --dry-run
 
 ### Label-based site/tenant mapping
 
-By default every device is placed in the `Unknown` site and `Unknown` tenant (both auto-created if absent). Enable `--label-site` and/or `--label-tenant` to let OneView labels override these per device. Each label is matched against NetBox site/tenant names and slugs — first match wins.
+Enable `--label-site` and/or `--label-tenant` to resolve site and tenant per device from OneView labels. Each label on the device is matched against NetBox site/tenant names and slugs — first match wins. Devices where either site or tenant cannot be resolved are **skipped with a warning** and not written to NetBox.
 
 ```bash
-# Devices with label "DCWest" go to site=DCWest; label "ACME" goes to tenant=ACME.
-# Devices with no matching label fall back to site=Unknown / tenant=Unknown.
+# Devices with label "DCWest" go to site=DCWest; label "ACME" sets tenant=ACME.
+# Devices with no matching label for site or tenant are skipped.
 python oneview_to_netbox.py ... --label-site --label-tenant
 ```
+
+If `--label-site` / `--label-tenant` are not used, `--site` and `--tenant` set the global defaults (both default to `Unknown` and are auto-created if absent). Devices that resolve to `Unknown` for either field are still skipped.
 
 **Label format** — OneView labels are alphanumeric only, so the label name must match the NetBox site or tenant name or slug directly:
 
@@ -168,8 +170,10 @@ python oneview_to_netbox.py ... --server-filter db01 db02 --chassis-filter encl-
 
 ### Behaviour
 
-- **Idempotent** — safe to run repeatedly; unchanged records are skipped.
+- **Idempotent** — safe to run repeatedly; unchanged records are updated in place; unchanged records are skipped.
+- **Site/tenant changes** — if a label changes a device's site or tenant, the existing NetBox record is updated in place rather than a duplicate being created.
+- **Unresolved site or tenant** — devices where either site or tenant resolves to `Unknown` are skipped with a warning naming the missing field(s).
 - **Server names** — uses the OS hostname (`serverName`) in preference to the OneView inventory name; domain suffixes are stripped.
 - **Unique names enforced** — duplicate server or chassis names (after domain-stripping) are skipped with a warning.
 - **Chassis skip** — enclosures without a URI and blade servers whose chassis wasn't synced are skipped automatically.
-- **Field-level diffs** — dry-run shows exactly which fields would change, with ANSI colour output in a TTY.
+- **Field-level diffs** — dry-run shows exactly which fields would change (including site and tenant), with ANSI colour output in a TTY.
