@@ -165,6 +165,22 @@ class OneViewClient:
     def get_server_hardware(self) -> list:
         return self._get_all("/rest/server-hardware")
 
+    def get_resource_labels(self, resource_uri: str) -> list:
+        """Return label names assigned to a resource URI."""
+        if not resource_uri:
+            return []
+        try:
+            resp = self.session.get(
+                f"{self.base_url}/rest/labels/resources",
+                params={"resourceUri": resource_uri},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return [m.get("name", "") for m in data.get("members", []) if m.get("name")]
+        except Exception:
+            return []
+
     def logout(self) -> None:
         try:
             self.session.delete(f"{self.base_url}/rest/login-sessions", timeout=10)
@@ -190,12 +206,16 @@ class NetBoxSync:
         server_role: str,
         tenant_name: Optional[str] = None,
         device_types_file: Optional[str] = None,
+        label_site_prefix: Optional[str] = None,
+        label_tenant_prefix: Optional[str] = None,
         dry_run: bool = False,
     ):
-        self.dry_run      = dry_run
-        self.chassis_role = chassis_role
-        self.server_role  = server_role
-        self.nb           = pynetbox.api(url, token=token)
+        self.dry_run              = dry_run
+        self.chassis_role         = chassis_role
+        self.server_role          = server_role
+        self.nb                   = pynetbox.api(url, token=token)
+        self._label_site_prefix   = label_site_prefix
+        self._label_tenant_prefix = label_tenant_prefix
 
         self._manufacturer                  = None
         self._device_types: dict            = {}   # slug → object
@@ -203,6 +223,8 @@ class NetBoxSync:
         self._enclosure_uri_map: dict       = {}   # OV uri → nb device
         self._seen_chassis_names: set       = set()
         self._seen_server_names: set        = set()
+        self._site_cache: dict              = {}   # name → site object
+        self._tenant_cache: dict            = {}   # name → tenant object
         self._type_defs: list               = self._load_type_defs(device_types_file) if device_types_file else []
 
         try:
@@ -232,6 +254,45 @@ class NetBoxSync:
             if tenants:
                 return tenants[0]
         sys.exit(f"Tenant '{name}' not found in NetBox. Create it first.")
+
+    def _find_site(self, name: str):
+        """Look up a site by name/slug; warn and return None if not found."""
+        if name in self._site_cache:
+            return self._site_cache[name]
+        for filt in ({"name": name}, {"slug": self._slugify(name)}):
+            sites = list(self.nb.dcim.sites.filter(**filt))
+            if sites:
+                self._site_cache[name] = sites[0]
+                return sites[0]
+        print(f"  {yellow('[WARN]')} Label site '{name}' not found in NetBox — using default")
+        return None
+
+    def _find_tenant(self, name: str):
+        """Look up a tenant by name/slug; warn and return None if not found."""
+        if name in self._tenant_cache:
+            return self._tenant_cache[name]
+        for filt in ({"name": name}, {"slug": self._slugify(name)}):
+            tenants = list(self.nb.tenancy.tenants.filter(**filt))
+            if tenants:
+                self._tenant_cache[name] = tenants[0]
+                return tenants[0]
+        print(f"  {yellow('[WARN]')} Label tenant '{name}' not found in NetBox — using default")
+        return None
+
+    def _apply_labels(self, labels: list) -> tuple:
+        """Return (site_override, tenant_override) derived from OneView labels, or (None, None)."""
+        site_override   = None
+        tenant_override = None
+        for label in labels:
+            if self._label_site_prefix and label.startswith(self._label_site_prefix):
+                value = label[len(self._label_site_prefix):]
+                if value:
+                    site_override = self._find_site(value)
+            if self._label_tenant_prefix and label.startswith(self._label_tenant_prefix):
+                value = label[len(self._label_tenant_prefix):]
+                if value:
+                    tenant_override = self._find_tenant(value)
+        return site_override, tenant_override
 
     @staticmethod
     def _load_type_defs(path: str) -> list:
@@ -365,7 +426,7 @@ class NetBoxSync:
 
     # ---- enclosure sync ----------------------------------------------------
 
-    def sync_enclosure(self, enc: dict) -> tuple:
+    def sync_enclosure(self, enc: dict, labels: list = None) -> tuple:
         """Create or update a chassis device from a OneView enclosure."""
         name   = (enc.get("name") or "").strip()
         serial = enc.get("serialNumber") or ""
@@ -382,6 +443,10 @@ class NetBoxSync:
         if not uri:
             return "skipped", None
 
+        site_override, tenant_override = self._apply_labels(labels or [])
+        site   = site_override   or self._site
+        tenant = tenant_override or self._tenant
+
         self._seen_chassis_names.add(name)
         dt   = self._get_device_type(model, u_height=10, subdevice_role="parent")
         role = self._get_device_role(self.chassis_role)
@@ -390,13 +455,13 @@ class NetBoxSync:
             "name":        name,
             "device_type": dt.id,
             "role":        role.id,
-            "site":        self._site.id,
+            "site":        site.id,
             "serial":      serial,
             "status":      "active",
-            "tenant":      self._tenant.id if self._tenant else None,
+            "tenant":      tenant.id if tenant else None,
         }
 
-        existing = list(self.nb.dcim.devices.filter(name=name, site_id=self._site.id))
+        existing = list(self.nb.dcim.devices.filter(name=name, site_id=site.id))
 
         if self.dry_run:
             if existing:
@@ -450,7 +515,7 @@ class NetBoxSync:
 
     # ---- server sync -------------------------------------------------------
 
-    def sync_server(self, server: dict) -> tuple:
+    def sync_server(self, server: dict, labels: list = None) -> tuple:
         """Create or update a server device from OneView server hardware."""
         raw_name     = (server.get("serverName") or server.get("name") or "").strip()
         name         = raw_name.split(".")[0]
@@ -468,6 +533,11 @@ class NetBoxSync:
         if is_blade and location_uri not in self._enclosure_uri_map:
             print(f"  {yellow('[SKIPPED]')} Server: {name}  — chassis URI not found ({location_uri})")
             return "skipped", None
+
+        site_override, tenant_override = self._apply_labels(labels or [])
+        site   = site_override   or self._site
+        tenant = tenant_override or self._tenant
+
         nb_status = "active" if power_state == "On" else "offline"
         dt        = self._get_device_type(model, u_height=0 if is_blade else 1,
                                            subdevice_role="child" if is_blade else None)
@@ -477,13 +547,13 @@ class NetBoxSync:
             "name":        name,
             "device_type": dt.id,
             "role":        role.id,
-            "site":        self._site.id,
+            "site":        site.id,
             "serial":      serial,
             "status":      nb_status,
-            "tenant":      self._tenant.id if self._tenant else None,
+            "tenant":      tenant.id if tenant else None,
         }
 
-        existing = list(self.nb.dcim.devices.filter(name=name, site_id=self._site.id))
+        existing = list(self.nb.dcim.devices.filter(name=name, site_id=site.id))
 
         blade_str = f"  bay={position}" if is_blade else ""
 
@@ -620,6 +690,14 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--server-role",  default="Server",
                    help="DeviceRole name for servers (default: Server)")
 
+    g = p.add_argument_group("Label mappings")
+    g.add_argument("--label-site",   default=None, metavar="PREFIX",
+                   help="OneView label prefix that overrides the NetBox site per device "
+                        "(e.g. 'site:' matches label 'site:DC-West' → site=DC-West)")
+    g.add_argument("--label-tenant", default=None, metavar="PREFIX",
+                   help="OneView label prefix that overrides the NetBox tenant per device "
+                        "(e.g. 'tenant:' matches label 'tenant:ACME' → tenant=ACME)")
+
     g = p.add_argument_group("Behaviour")
     g.add_argument("--no-ssl-verify", action="store_true",
                    help="Disable TLS certificate verification for OneView (lab use)")
@@ -687,8 +765,11 @@ def main() -> None:
         server_role=args.server_role,
         tenant_name=args.tenant,
         device_types_file=args.device_types_file,
+        label_site_prefix=args.label_site,
+        label_tenant_prefix=args.label_tenant,
         dry_run=args.dry_run,
     )
+    use_labels = bool(args.label_site or args.label_tenant)
     tenant_str = f"  tenant: {syncer._tenant.name}" if syncer._tenant else ""
     print(f"  Connected  (site: {syncer._site.name}{tenant_str})")
 
@@ -701,7 +782,8 @@ def main() -> None:
         stats: dict = {"created": 0, "updated": 0, "unchanged": 0, "skipped": 0, "errors": 0}
         for enc in enclosures:
             try:
-                action, device = syncer.sync_enclosure(enc)
+                labels = ov.get_resource_labels(enc.get("uri", "")) if use_labels else []
+                action, device = syncer.sync_enclosure(enc, labels=labels)
                 stats[action] += 1
                 if not args.dry_run and action != "skipped":
                     colour = green if action == "created" else (yellow if action == "updated" else cyan)
@@ -721,7 +803,8 @@ def main() -> None:
         stats = {"created": 0, "updated": 0, "unchanged": 0, "skipped": 0, "errors": 0}
         for server in servers:
             try:
-                action, device = syncer.sync_server(server)
+                labels = ov.get_resource_labels(server.get("uri", "")) if use_labels else []
+                action, device = syncer.sync_server(server, labels=labels)
                 stats[action] += 1
                 if not args.dry_run and action != "skipped":
                     colour = green if action == "created" else (yellow if action == "updated" else cyan)
