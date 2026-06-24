@@ -117,8 +117,8 @@ python oneview_to_netbox.py ... --dry-run
 |---|---|---|
 | `--oneview-password` | _(prompted)_ | OneView password; prompted via stdin if omitted |
 | `--oneview-api-version` | auto-detect | OneView REST API version |
-| `--site` | required | NetBox site where devices are placed |
-| `--tenant` | — | NetBox tenant assigned to all synced devices |
+| `--site` | `Unknown` | NetBox site for devices; auto-created if it doesn't exist |
+| `--tenant` | `Unknown` | NetBox tenant for devices; auto-created if it doesn't exist |
 | `--chassis-role` | `Chassis` | DeviceRole name for enclosures |
 | `--server-role` | `Server` | DeviceRole name for servers |
 | `--device-types-file` | — | YAML file mapping OneView model names to NetBox DeviceType definitions |
@@ -134,18 +134,22 @@ python oneview_to_netbox.py ... --dry-run
 
 ### Label-based site/tenant mapping
 
-OneView labels can override the global `--site` and `--tenant` on a per-device basis. When `--label-site` or `--label-tenant` is set, each label on the device is matched against NetBox site/tenant names and slugs. The first match wins; if no label matches, the global default is used.
+By default every device is placed in the `Unknown` site and `Unknown` tenant (both auto-created if absent). Enable `--label-site` and/or `--label-tenant` to let OneView labels override these per device. Each label is matched against NetBox site/tenant names and slugs — first match wins.
 
 ```bash
-# A device with labels ["DCWest", "ACME"] will be placed in site=DCWest
-# and assigned tenant=ACME if those names exist in NetBox
-python oneview_to_netbox.py ... \
-    --site         fallback-dc \
-    --label-site \
-    --label-tenant
+# Devices with label "DCWest" go to site=DCWest; label "ACME" goes to tenant=ACME.
+# Devices with no matching label fall back to site=Unknown / tenant=Unknown.
+python oneview_to_netbox.py ... --label-site --label-tenant
 ```
 
-Note: OneView labels are alphanumeric only, so the label name itself must match the NetBox site or tenant name/slug.
+**Label format** — OneView labels are alphanumeric only, so the label name must match the NetBox site or tenant name or slug directly:
+
+| OneView label | Matches NetBox site/tenant |
+|---|---|
+| `London` | name `London` or slug `london` |
+| `ACME` | name `ACME` or slug `acme` |
+| `DCWest` | name `DCWest` or slug `dc-west` |
+| `DC1` | name `DC1` or slug `dc1` |
 
 ### Targeted sync
 
@@ -166,5 +170,6 @@ python oneview_to_netbox.py ... --server-filter db01 db02 --chassis-filter encl-
 
 - **Idempotent** — safe to run repeatedly; unchanged records are skipped.
 - **Server names** — uses the OS hostname (`serverName`) in preference to the OneView inventory name; domain suffixes are stripped.
+- **Unique names enforced** — duplicate server or chassis names (after domain-stripping) are skipped with a warning.
 - **Chassis skip** — enclosures without a URI and blade servers whose chassis wasn't synced are skipped automatically.
 - **Field-level diffs** — dry-run shows exactly which fields would change, with ANSI colour output in a TTY.
