@@ -844,6 +844,8 @@ def main() -> None:
         for enc in enclosures:
             try:
                 labels = ov.get_resource_labels(enc.get("uri", "")) if use_labels else []
+                if use_labels and labels:
+                    print(f"  {cyan('[LABELS]')} {enc.get('name', '?')}: {', '.join(labels)}")
                 action, device = syncer.sync_enclosure(enc, labels=labels)
                 stats[action] += 1
                 if not args.dry_run and action != "skipped":
@@ -871,6 +873,9 @@ def main() -> None:
         for server in servers:
             try:
                 labels = ov.get_resource_labels(server.get("uri", "")) if use_labels else []
+                if use_labels and labels:
+                    raw = (server.get("serverName") or server.get("name") or "?").split(".")[0]
+                    print(f"  {cyan('[LABELS]')} {raw}: {', '.join(labels)}")
                 action, device = syncer.sync_server(server, labels=labels)
                 stats[action] += 1
                 if not args.dry_run and action != "skipped":
