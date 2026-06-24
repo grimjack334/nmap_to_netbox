@@ -405,6 +405,23 @@ class NetBoxSync:
         print(f"  {green('[CREATED]')} DeviceRole: {role_name}")
         return role
 
+    # ---- device lookup -----------------------------------------------------
+
+    def _find_device(self, name: str, site_id, tenant_id) -> list:
+        """Return matching device(s), preferring exact (name, site, tenant) over name-only.
+
+        Searching by name only can return a device at a different location; updating it
+        to the new (site, tenant) then hits the unique constraint if a device already
+        exists there.  By trying the exact target first we avoid that collision.
+        """
+        if site_id is not None and tenant_id is not None:
+            exact = list(self.nb.dcim.devices.filter(
+                name=name, site_id=site_id, tenant_id=tenant_id,
+            ))
+            if exact:
+                return exact
+        return list(self.nb.dcim.devices.filter(name=name))
+
     # ---- diff --------------------------------------------------------------
 
     def _diff_device(self, existing, desired: dict) -> list:
@@ -485,7 +502,7 @@ class NetBoxSync:
             "tenant":      tenant.id,
         }
 
-        existing = list(self.nb.dcim.devices.filter(name=name))
+        existing = self._find_device(name, site.id, tenant.id)
 
         if self.dry_run:
             if existing:
@@ -585,7 +602,7 @@ class NetBoxSync:
             "tenant":      tenant.id,
         }
 
-        existing = list(self.nb.dcim.devices.filter(name=name))
+        existing = self._find_device(name, site.id, tenant.id)
 
         blade_str = f"  bay={position}" if is_blade else ""
 
