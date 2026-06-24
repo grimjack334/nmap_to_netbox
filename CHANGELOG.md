@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.1.6] - 2026-06-24
+
+### Changed
+- `--label-site` and `--label-tenant` are now boolean flags instead of prefix strings; each device label is matched directly against NetBox site/tenant names and slugs (required by OneView's alphanumeric-only label constraint)
+
 ## [1.1.5] - 2026-06-24
 
 ### Added
