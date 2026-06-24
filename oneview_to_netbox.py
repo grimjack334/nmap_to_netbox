@@ -423,6 +423,13 @@ class NetBoxSync:
         if new_status and cur_status != new_status:
             changes.append(f"    status: {red(cur_status)} → {green(new_status)}")
 
+        new_site_id = desired.get("site")
+        cur_site_id = existing.site.id if existing.site else None
+        if new_site_id != cur_site_id:
+            cur_label = str(existing.site) if existing.site else "None"
+            new_label = str(new_site_id) if new_site_id else "None"
+            changes.append(f"    site: {red(cur_label)} → {green(new_label)}")
+
         new_tenant_id = desired.get("tenant")
         cur_tenant_id = existing.tenant.id if existing.tenant else None
         if new_tenant_id != cur_tenant_id:
@@ -459,6 +466,10 @@ class NetBoxSync:
         site   = site_override   or self._site
         tenant = tenant_override or self._tenant
 
+        if site.name.lower() == "unknown" and tenant.name.lower() == "unknown":
+            print(f"  {yellow('[WARN]')} Chassis '{name}' has no site or tenant set — skipping")
+            return "skipped", None
+
         self._seen_chassis_names.add(name)
         dt   = self._get_device_type(model, u_height=10, subdevice_role="parent")
         role = self._get_device_role(self.chassis_role)
@@ -473,7 +484,7 @@ class NetBoxSync:
             "tenant":      tenant.id,
         }
 
-        existing = list(self.nb.dcim.devices.filter(name=name, site_id=site.id))
+        existing = list(self.nb.dcim.devices.filter(name=name))
 
         if self.dry_run:
             if existing:
@@ -553,6 +564,10 @@ class NetBoxSync:
         site   = site_override   or self._site
         tenant = tenant_override or self._tenant
 
+        if site.name.lower() == "unknown" and tenant.name.lower() == "unknown":
+            print(f"  {yellow('[WARN]')} Server '{name}' has no site or tenant set — skipping")
+            return "skipped", None
+
         nb_status = "active" if power_state == "On" else "offline"
         dt        = self._get_device_type(model, u_height=0 if is_blade else 1,
                                            subdevice_role="child" if is_blade else None)
@@ -568,7 +583,7 @@ class NetBoxSync:
             "tenant":      tenant.id,
         }
 
-        existing = list(self.nb.dcim.devices.filter(name=name, site_id=site.id))
+        existing = list(self.nb.dcim.devices.filter(name=name))
 
         blade_str = f"  bay={position}" if is_blade else ""
 
