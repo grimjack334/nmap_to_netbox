@@ -466,6 +466,7 @@ class NetBoxSync:
         self._seen_server_names.add(name)
         is_blade  = bool(location_uri and position is not None)
         if is_blade and location_uri not in self._enclosure_uri_map:
+            print(f"  {yellow('[SKIPPED]')} Server: {name}  — chassis URI not found ({location_uri})")
             return "skipped", None
         nb_status = "active" if power_state == "On" else "offline"
         dt        = self._get_device_type(model, u_height=0 if is_blade else 1,
