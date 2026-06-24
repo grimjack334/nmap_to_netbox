@@ -184,7 +184,7 @@ python oneview_to_netbox.py ... --server-filter db01 db02 --chassis-filter encl-
 ### Behaviour
 
 - **Idempotent** — safe to run repeatedly; changed records are updated in place, unchanged records are skipped.
-- **Site/tenant changes** — if a label changes a device's site or tenant, the existing NetBox record is updated in place rather than a duplicate being created.
+- **Site/tenant changes** — if a label changes a device's site or tenant, the existing NetBox record is updated in place. The lookup tries an exact (name, site, tenant) match first; if not found it searches by name only to locate the record to move, avoiding constraint violations.
 - **Unresolved site or tenant** — devices where either site or tenant resolves to `Unknown` are skipped with a warning naming the missing field(s).
 - **Server names** — uses the OS hostname (`serverName`) in preference to the OneView inventory name; domain suffixes are stripped.
 - **Unique names enforced** — duplicate server or chassis names (after domain-stripping) are skipped with a warning.
