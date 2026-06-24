@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-06-24
+
+### Changed
+- README usage examples updated to show `--site` as optional and demonstrate label-only vs explicit fallback patterns
+- Fixed duplicate phrase in Behaviour section
+- Intro bullet updated to mention skip behaviour for unresolved site/tenant
+
 ## [1.2.1] - 2026-06-24
 
 ### Changed
