@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.3] - 2026-06-24
+
+### Fixed
+- Label fetch was silently returning empty results because the OneView `/rest/labels/resources` response uses `{"labels": [...]}` not `{"members": [...]}` as previously assumed; both keys are now tried for compatibility
+- Label API errors are now surfaced as warnings on stderr instead of being swallowed silently
+
+### Added
+- `[LABELS]` log line printed per device when labels are fetched, showing the label names resolved from OneView — aids debugging of label-to-site/tenant matching
+
 ## [1.3.2] - 2026-06-24
 
 ### Changed
