@@ -190,7 +190,7 @@ python oneview_to_netbox.py ... --site default-dc --tenant default-tenant --labe
   [LABELS] encl-a: London
 ```
 
-If no `[LABELS]` line appears for a device, the label fetch returned empty — check for a `[WARN]` on stderr indicating an API error, or verify that labels are assigned to the device in OneView. If the line appears but the device is still skipped, the label value does not match any NetBox site or tenant name/slug.
+If no `[LABELS]` line appears for a device, the label fetch returned empty — verify that labels are assigned to the device in OneView. The script automatically tries both endpoint forms used by different OneView versions (query-param and path-based), so no manual configuration is needed. If the `[LABELS]` line appears but the device is still skipped, the label value does not match any NetBox site or tenant name/slug — check the exact name and slug of the site/tenant in NetBox and ensure the OneView label matches one of them.
 
 ### Targeted sync
 
