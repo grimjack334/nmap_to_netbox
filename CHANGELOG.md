@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Removed
+- `oneview_to_netbox.py`, `ONEVIEW_TO_NETBOX.md`, and `hpe_device_types.yaml` moved to the `netbox-manual` repo, since that's where the rest of this project's NetBox-focused tooling lives. `requests` and `pyyaml` dropped from `requirements.txt` — they were only needed by the OneView sync.
+
 ## [1.5.1] - 2026-06-24
 
 ### Changed
